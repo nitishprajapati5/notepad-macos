@@ -25,6 +25,10 @@
                                                     defer:NO];
     [win center];
     win.minSize = NSMakeSize(400, 200);
+    win.backgroundColor = [NSColor whiteColor];
+    if (@available(macOS 10.14, *)) {
+        win.appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+    }
     [win setFrameAutosaveName:@"NotepadMainWindow"];
 
     self = [super initWithWindow:win];

@@ -35,29 +35,13 @@
     [self setStringProperty:SCI_STYLESETFONT parameter:STYLE_DEFAULT value:fontName];
     [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:fontSize];
 
-    // Dynamic appearance colors
-    NSAppearance *appearance = self.effectiveAppearance ?: [NSApp effectiveAppearance];
-    BOOL isDark = NO;
-    if (@available(macOS 10.14, *)) {
-        NSAppearanceName match = [appearance bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
-        isDark = [match isEqualToString:NSAppearanceNameDarkAqua];
-    }
-
-    if (isDark) {
-        [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_DEFAULT value:[NSColor whiteColor]];
-        [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_DEFAULT value:[NSColor colorWithCalibratedWhite:0.12 alpha:1.0]];
-        [self setColorProperty:SCI_SETCARETLINEBACK parameter:0 value:[NSColor colorWithCalibratedWhite:0.18 alpha:1.0]];
-        [self setColorProperty:SCI_SETCARETFORE parameter:0 value:[NSColor whiteColor]];
-        [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.55 alpha:1.0]];
-        [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.16 alpha:1.0]];
-    } else {
-        [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_DEFAULT value:[NSColor blackColor]];
-        [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_DEFAULT value:[NSColor whiteColor]];
-        [self setColorProperty:SCI_SETCARETLINEBACK parameter:0 value:[NSColor colorWithCalibratedRed:0.95 green:0.95 blue:0.97 alpha:1.0]];
-        [self setColorProperty:SCI_SETCARETFORE parameter:0 value:[NSColor blackColor]];
-        [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.50 alpha:1.0]];
-        [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]];
-    }
+    // Window and editor colors: pure white background with black text
+    [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_DEFAULT value:[NSColor blackColor]];
+    [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_DEFAULT value:[NSColor whiteColor]];
+    [self setColorProperty:SCI_SETCARETLINEBACK parameter:0 value:[NSColor colorWithCalibratedRed:0.96 green:0.96 blue:0.98 alpha:1.0]];
+    [self setColorProperty:SCI_SETCARETFORE parameter:0 value:[NSColor blackColor]];
+    [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.50 alpha:1.0]];
+    [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]];
 
     [self message:SCI_STYLECLEARALL];
 
