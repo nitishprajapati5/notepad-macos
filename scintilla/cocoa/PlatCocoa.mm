@@ -1263,12 +1263,20 @@ void SurfaceImpl::DrawTextTransparent(PRectangle rc, const Font *font_, XYPOSITI
 						   fore.GetBlueComponent(),
 						   fore.GetAlphaComponent());
 
-	style->setCTStyleColour(color);
+	CGContextSetFillColorWithColor(gc, color);
+	CGContextSetStrokeColorWithColor(gc, color);
+	CGContextSetRGBFillColor(gc,
+				 fore.GetRedComponent(),
+				 fore.GetGreenComponent(),
+				 fore.GetBlueComponent(),
+				 fore.GetAlphaComponent());
 
-	CGColorRelease(color);
+	style->setCTStyleColour(color);
 
 	QuartzTextLayout layoutDraw(text, encoding, style);
 	layoutDraw.draw(gc, rc.left, ybase);
+
+	CGColorRelease(color);
 }
 
 //--------------------------------------------------------------------------------------------------
@@ -1380,12 +1388,20 @@ void SurfaceImpl::DrawTextTransparentUTF8(PRectangle rc, const Font *font_, XYPO
 						   fore.GetBlueComponent(),
 						   fore.GetAlphaComponent());
 
-	style->setCTStyleColour(color);
+	CGContextSetFillColorWithColor(gc, color);
+	CGContextSetStrokeColorWithColor(gc, color);
+	CGContextSetRGBFillColor(gc,
+				 fore.GetRedComponent(),
+				 fore.GetGreenComponent(),
+				 fore.GetBlueComponent(),
+				 fore.GetAlphaComponent());
 
-	CGColorRelease(color);
+	style->setCTStyleColour(color);
 
 	QuartzTextLayout layoutDraw(text, encoding, style);
 	layoutDraw.draw(gc, rc.left, ybase);
+
+	CGColorRelease(color);
 }
 
 //--------------------------------------------------------------------------------------------------

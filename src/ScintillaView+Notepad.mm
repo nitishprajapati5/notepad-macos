@@ -32,27 +32,41 @@
         }
     }
 
+    // Set font & size on STYLE_DEFAULT
     [self setStringProperty:SCI_STYLESETFONT parameter:STYLE_DEFAULT value:fontName];
     [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:fontSize];
 
-    // Window and editor colors: pure white background with black text
-    [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_DEFAULT value:[NSColor blackColor]];
-    [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_DEFAULT value:[NSColor whiteColor]];
-    [self setColorProperty:SCI_SETCARETLINEBACK parameter:0 value:[NSColor colorWithCalibratedRed:0.96 green:0.96 blue:0.98 alpha:1.0]];
-    [self setColorProperty:SCI_SETCARETFORE parameter:0 value:[NSColor blackColor]];
-    [self setColorProperty:SCI_STYLESETFORE parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.50 alpha:1.0]];
-    [self setColorProperty:SCI_STYLESETBACK parameter:STYLE_LINENUMBER value:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]];
+    // Colors: Pure White background (0xFFFFFF) and Pitch-Black text (0x000000)
+    // Note: Scintilla BGR/RGB integer format: Black = 0x000000, White = 0xFFFFFF
+    [self message:SCI_STYLESETFORE wParam:STYLE_DEFAULT lParam:0x000000];
+    [self message:SCI_STYLESETBACK wParam:STYLE_DEFAULT lParam:0xFFFFFF];
 
+    // Clear all styles to copy STYLE_DEFAULT across all style slots
     [self message:SCI_STYLECLEARALL];
 
-    // Native selection highlight
+    // Explicitly enforce black text and white background across all styles 0..127
+    // Style 0 is the primary style applied to all typed plain text without a lexer.
+    for (int i = 0; i < 128; i++) {
+        [self message:SCI_STYLESETFORE wParam:i lParam:0x000000];
+        [self message:SCI_STYLESETBACK wParam:i lParam:0xFFFFFF];
+        [self setStringProperty:SCI_STYLESETFONT parameter:i value:fontName];
+        [self setGeneralProperty:SCI_STYLESETSIZE parameter:i value:fontSize];
+    }
+
+    // Line number margin styling (when enabled)
+    [self message:SCI_STYLESETFORE wParam:STYLE_LINENUMBER lParam:0x707070];
+    [self message:SCI_STYLESETBACK wParam:STYLE_LINENUMBER lParam:0xF5F5F5];
+
+    // Caret styling: Black 1px cursor matching Windows Notepad, no caret line background
+    [self message:SCI_SETCARETFORE wParam:0x000000 lParam:0];
+    [self message:SCI_SETCARETWIDTH wParam:1 lParam:0];
+    [self message:SCI_SETCARETLINEVISIBLE wParam:0 lParam:0];
+
+    // Selection colors: native macOS selection highlight with white selected text
     [self setColorProperty:SCI_SETSELBACK parameter:1 value:[NSColor selectedTextBackgroundColor]];
+    [self setColorProperty:SCI_SETSELFORE parameter:1 value:[NSColor selectedTextColor]];
 
-    // Caret appearance & line highlight
-    [self message:SCI_SETCARETLINEVISIBLE wParam:1 lParam:0];
-    [self message:SCI_SETCARETWIDTH wParam:2 lParam:0];
-
-    // Tab & EOL setup (Phase 2.2 defaults: tab width 4, use tabs, EOL LF)
+    // Tab & EOL setup (Phase 2 defaults: tab width 4, use tabs, EOL LF)
     NSInteger tabWidth = prefs.tabWidth > 0 ? prefs.tabWidth : 4;
     [self message:SCI_SETTABWIDTH wParam:tabWidth lParam:0];
     [self message:SCI_SETUSETABS wParam:1 lParam:0]; // Use spaces: false -> use tabs
@@ -89,9 +103,10 @@
 
 - (void)np_setFontName:(NSString *)fontName size:(NSInteger)pointSize {
     [self suspendDrawing:YES];
-    [self setStringProperty:SCI_STYLESETFONT parameter:STYLE_DEFAULT value:fontName];
-    [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:pointSize];
-    [self message:SCI_STYLECLEARALL];
+    for (int i = 0; i < 128; i++) {
+        [self setStringProperty:SCI_STYLESETFONT parameter:i value:fontName];
+        [self setGeneralProperty:SCI_STYLESETSIZE parameter:i value:pointSize];
+    }
     [self suspendDrawing:NO];
 }
 

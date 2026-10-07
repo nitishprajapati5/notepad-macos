@@ -93,6 +93,13 @@
         _statusBarHeightConstraint
     ]];
 
+    if (@available(macOS 10.14, *)) {
+        NSAppearance *aqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+        window.appearance = aqua;
+        _editor.appearance = aqua;
+        _statusBar.appearance = aqua;
+    }
+
     // Apply default theme and initial editor settings
     [_editor np_applyDefaultTheme];
     [_editor message:SCI_SETSAVEPOINT];
