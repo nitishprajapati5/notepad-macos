@@ -6,7 +6,7 @@ NS_ASSUME_NONNULL_BEGIN
 @class StatusBarView;
 @class FindReplaceController;
 
-@interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol>
+@interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation>
 
 @property (nonatomic, strong) ScintillaView *editor;
 @property (nonatomic, strong) StatusBarView *statusBar;
@@ -29,6 +29,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (IBAction)openDocument:(nullable id)sender;
 - (IBAction)saveDocument:(nullable id)sender;
 - (IBAction)saveDocumentAs:(nullable id)sender;
+- (IBAction)revertDocument:(nullable id)sender;
 - (IBAction)printDocument:(nullable id)sender;
 
 - (IBAction)showFind:(nullable id)sender;
@@ -45,6 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (IBAction)zoomOut:(nullable id)sender;
 - (IBAction)restoreDefaultZoom:(nullable id)sender;
 - (IBAction)toggleStatusBar:(nullable id)sender;
+- (IBAction)toggleLineNumbers:(nullable id)sender;
 
 @end
 

@@ -1,4 +1,5 @@
 #import "NotepadWindowController.h"
+#import "NotepadFileManager.h"
 #import "AppDelegate.h"
 #import "ScintillaView+Notepad.h"
 #import "StatusBarView.h"
@@ -79,7 +80,9 @@
     _statusBar.translatesAutoresizingMaskIntoConstraints = NO;
     [contentView addSubview:_statusBar];
 
-    _statusBarHeightConstraint = [_statusBar.heightAnchor constraintEqualToConstant:24.0];
+    BOOL showStatusBar = [PreferencesManager sharedManager].showStatusBar;
+    _statusBar.hidden = !showStatusBar;
+    _statusBarHeightConstraint = [_statusBar.heightAnchor constraintEqualToConstant:showStatusBar ? 24.0 : 0.0];
 
     [NSLayoutConstraint activateConstraints:@[
         [_editor.topAnchor constraintEqualToAnchor:contentView.topAnchor],
@@ -169,42 +172,7 @@
 }
 
 - (void)loadFile:(NSString *)path {
-    NSError *error = nil;
-    NSStringEncoding usedEncoding = NSUTF8StringEncoding;
-    NSString *content = [NSString stringWithContentsOfFile:path
-                                               usedEncoding:&usedEncoding
-                                                      error:&error];
-    if (!content) {
-        content = [NSString stringWithContentsOfFile:path
-                                            encoding:NSISOLatin1StringEncoding
-                                               error:&error];
-        usedEncoding = NSISOLatin1StringEncoding;
-    }
-
-    if (content) {
-        self.encoding = usedEncoding;
-        self.filePath = path;
-        [self.editor np_setText:content];
-
-        // Detect EOL from file content
-        if ([content containsString:@"\r\n"]) {
-            [self.editor message:SCI_SETEOLMODE wParam:SC_EOL_CRLF lParam:0];
-        } else if ([content containsString:@"\n"]) {
-            [self.editor message:SCI_SETEOLMODE wParam:SC_EOL_LF lParam:0];
-        } else if ([content containsString:@"\r"]) {
-            [self.editor message:SCI_SETEOLMODE wParam:SC_EOL_CR lParam:0];
-        }
-
-        [self.editor message:SCI_SETSAVEPOINT];
-        self.isDirty = NO;
-        [self updateWindowTitle];
-        [self updateStatusBar];
-    } else {
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = @"Could not open file";
-        alert.informativeText = error.localizedDescription ?: @"Unknown error occurred.";
-        [alert beginSheetModalForWindow:self.window completionHandler:nil];
-    }
+    [[NotepadFileManager sharedManager] openFileAtPath:path inController:self];
 }
 
 #pragma mark - Scintilla Notifications
@@ -277,51 +245,15 @@
 }
 
 - (IBAction)openDocument:(nullable id)sender {
-    AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
-    [appDelegate openDocument:sender];
+    [[NotepadFileManager sharedManager] openDocumentInController:self];
 }
 
 - (BOOL)saveFile {
-    if (!self.filePath) {
-        return [self saveFileAs];
-    }
-
-    NSString *content = [self.editor np_text];
-    NSError *error = nil;
-    BOOL success = [content writeToFile:self.filePath
-                             atomically:YES
-                               encoding:self.encoding
-                                  error:&error];
-
-    if (success) {
-        [self.editor message:SCI_SETSAVEPOINT];
-        self.isDirty = NO;
-        [self updateWindowTitle];
-        return YES;
-    } else {
-        NSAlert *alert = [[NSAlert alloc] init];
-        alert.messageText = @"Save Failed";
-        alert.informativeText = error.localizedDescription ?: @"Could not save document.";
-        [alert beginSheetModalForWindow:self.window completionHandler:nil];
-        return NO;
-    }
+    return [[NotepadFileManager sharedManager] saveController:self];
 }
 
 - (BOOL)saveFileAs {
-    NSSavePanel *panel = [NSSavePanel savePanel];
-    if (self.filePath) {
-        panel.directoryURL = [NSURL fileURLWithPath:[self.filePath stringByDeletingLastPathComponent]];
-        panel.nameFieldStringValue = [self.filePath lastPathComponent];
-    } else {
-        panel.nameFieldStringValue = @"Untitled.txt";
-    }
-
-    NSModalResponse result = [panel runModal];
-    if (result == NSModalResponseOK && panel.URL.path) {
-        self.filePath = panel.URL.path;
-        return [self saveFile];
-    }
-    return NO;
+    return [[NotepadFileManager sharedManager] saveAsController:self];
 }
 
 - (IBAction)saveDocument:(nullable id)sender {
@@ -330,6 +262,10 @@
 
 - (IBAction)saveDocumentAs:(nullable id)sender {
     [self saveFileAs];
+}
+
+- (IBAction)revertDocument:(nullable id)sender {
+    [[NotepadFileManager sharedManager] revertController:self];
 }
 
 - (IBAction)printDocument:(nullable id)sender {
@@ -447,8 +383,56 @@
 - (IBAction)toggleStatusBar:(nullable id)sender {
     BOOL isHidden = self.statusBar.isHidden;
     self.statusBar.hidden = !isHidden;
-    _statusBarHeightConstraint.constant = isHidden ? 24.0 : 0.0;
+    self.statusBarHeightConstraint.constant = isHidden ? 24.0 : 0.0;
     [self.window.contentView layoutSubtreeIfNeeded];
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.showStatusBar = isHidden;
+    [prefs savePreferences];
+}
+
+- (IBAction)toggleLineNumbers:(nullable id)sender {
+    BOOL current = [self.editor np_lineNumbersVisible];
+    [self.editor np_setLineNumbersVisible:!current];
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.showLineNumbers = !current;
+    [prefs savePreferences];
+}
+
+#pragma mark - Menu Item Validation
+
+- (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
+    SEL action = menuItem.action;
+    if (action == @selector(saveDocument:)) {
+        return self.isDirty;
+    }
+    if (action == @selector(revertDocument:)) {
+        return self.filePath != nil && self.isDirty;
+    }
+    if (action == @selector(undo:)) {
+        return [self.editor message:SCI_CANUNDO] != 0;
+    }
+    if (action == @selector(redo:)) {
+        return [self.editor message:SCI_CANREDO] != 0;
+    }
+    if (action == @selector(cut:) || action == @selector(copy:)) {
+        return [self.editor getGeneralProperty:SCI_GETSELECTIONSTART] != [self.editor getGeneralProperty:SCI_GETSELECTIONEND];
+    }
+    if (action == @selector(toggleWordWrap:)) {
+        menuItem.state = [self.editor np_wordWrap] ? NSControlStateValueOn : NSControlStateValueOff;
+        return YES;
+    }
+    if (action == @selector(toggleStatusBar:)) {
+        menuItem.state = self.statusBar.isHidden ? NSControlStateValueOff : NSControlStateValueOn;
+        return YES;
+    }
+    if (action == @selector(toggleLineNumbers:)) {
+        menuItem.state = [self.editor np_lineNumbersVisible] ? NSControlStateValueOn : NSControlStateValueOff;
+        return YES;
+    }
+    if (action == @selector(restoreDefaultZoom:)) {
+        return [self.editor getGeneralProperty:SCI_GETZOOM] != 0;
+    }
+    return YES;
 }
 
 @end

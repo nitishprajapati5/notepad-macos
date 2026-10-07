@@ -11,6 +11,7 @@ extern NSString *const NPPreferencesDidChangeNotification;
 @property (nonatomic, assign) NSInteger tabWidth;
 @property (nonatomic, assign) BOOL wordWrap;
 @property (nonatomic, assign) BOOL showLineNumbers;
+@property (nonatomic, assign) BOOL showStatusBar;
 
 + (instancetype)sharedManager;
 - (void)savePreferences;

@@ -1,5 +1,7 @@
 #import "AppDelegate.h"
 #import "NotepadWindowController.h"
+#import "NotepadFileManager.h"
+#import "NotepadDocumentController.h"
 #import "ScintillaView+Notepad.h"
 
 @implementation AppDelegate
@@ -8,6 +10,7 @@
     self = [super init];
     if (self) {
         _windowControllers = [NSMutableArray array];
+        [NotepadDocumentController sharedDocumentController];
     }
     return self;
 }
@@ -25,6 +28,13 @@
     return YES;
 }
 
+- (void)application:(NSApplication *)sender openFiles:(NSArray<NSString *> *)filenames {
+    for (NSString *filename in filenames) {
+        [self openFileAtPath:filename];
+    }
+    [sender replyToOpenOrPrint:NSApplicationDelegateReplySuccess];
+}
+
 - (BOOL)applicationShouldTerminateAfterLastWindowClosed:(NSApplication *)sender {
     return NO;
 }
@@ -40,33 +50,15 @@
 }
 
 - (void)openDocument:(nullable id)sender {
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.canChooseFiles = YES;
-    panel.canChooseDirectories = NO;
-    panel.allowsMultipleSelection = NO;
-
-    NSWindow *keyWindow = [NSApp keyWindow];
-    [panel beginSheetModalForWindow:keyWindow completionHandler:^(NSModalResponse result) {
-        if (result == NSModalResponseOK && panel.URL.path) {
-            [self openFileAtPath:panel.URL.path];
-        }
-    }];
+    NSWindowController *activeWC = [[NSApp keyWindow] windowController];
+    NotepadWindowController *notepadWC = [activeWC isKindOfClass:[NotepadWindowController class]] ? (NotepadWindowController *)activeWC : nil;
+    [[NotepadFileManager sharedManager] openDocumentInController:notepadWC];
 }
 
 - (void)openFileAtPath:(NSString *)filePath {
-    // If key window is clean & empty, open in it
     NSWindowController *activeWC = [[NSApp keyWindow] windowController];
-    if ([activeWC isKindOfClass:[NotepadWindowController class]]) {
-        NotepadWindowController *notepadWC = (NotepadWindowController *)activeWC;
-        if (!notepadWC.filePath && !notepadWC.isDirty && [notepadWC.editor np_text].length == 0) {
-            [notepadWC loadFile:filePath];
-            return;
-        }
-    }
-
-    NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:filePath];
-    [self addWindowController:wc];
-    [wc showWindow:nil];
+    NotepadWindowController *notepadWC = [activeWC isKindOfClass:[NotepadWindowController class]] ? (NotepadWindowController *)activeWC : nil;
+    [[NotepadFileManager sharedManager] openFileAtPath:filePath inController:notepadWC];
 }
 
 - (void)addWindowController:(NotepadWindowController *)controller {
@@ -123,6 +115,17 @@
     [fileMenu addItemWithTitle:@"Open…"
                         action:@selector(openDocument:)
                  keyEquivalent:@"o"];
+
+    // Open Recent Submenu
+    NSMenuItem *openRecentItem = [[NSMenuItem alloc] initWithTitle:@"Open Recent" action:nil keyEquivalent:@""];
+    NSMenu *openRecentMenu = [[NSMenu alloc] initWithTitle:@"Open Recent"];
+    [openRecentMenu addItemWithTitle:@"Clear Menu"
+                              action:@selector(clearRecentDocuments:)
+                       keyEquivalent:@""];
+    [openRecentItem setSubmenu:openRecentMenu];
+    [fileMenu addItem:openRecentItem];
+
+    [fileMenu addItem:[NSMenuItem separatorItem]];
     [fileMenu addItemWithTitle:@"Save"
                         action:@selector(saveDocument:)
                  keyEquivalent:@"s"];
@@ -130,10 +133,13 @@
                                              action:@selector(saveDocumentAs:)
                                       keyEquivalent:@"S"];
     [saveAs setKeyEquivalentModifierMask:(NSEventModifierFlagShift | NSEventModifierFlagCommand)];
+    [fileMenu addItemWithTitle:@"Revert to Saved"
+                        action:@selector(revertDocument:)
+                 keyEquivalent:@""];
     [fileMenu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *pageSetup = [fileMenu addItemWithTitle:@"Page Setup…"
-                                                action:@selector(runPageSpec:)
-                                         keyEquivalent:@"P"];
+                                                 action:@selector(runPageSpec:)
+                                          keyEquivalent:@"P"];
     [pageSetup setKeyEquivalentModifierMask:(NSEventModifierFlagShift | NSEventModifierFlagCommand)];
     [fileMenu addItemWithTitle:@"Print…"
                         action:@selector(printDocument:)
@@ -176,8 +182,8 @@
                         action:@selector(findNext:)
                  keyEquivalent:@"g"];
     NSMenuItem *findPrev = [editMenu addItemWithTitle:@"Find Previous"
-                                               action:@selector(findPrevious:)
-                                        keyEquivalent:@"G"];
+                                                action:@selector(findPrevious:)
+                                         keyEquivalent:@"G"];
     [findPrev setKeyEquivalentModifierMask:(NSEventModifierFlagShift | NSEventModifierFlagCommand)];
     [editMenu addItemWithTitle:@"Replace…"
                         action:@selector(showReplace:)
@@ -232,10 +238,30 @@
     [viewMenu addItemWithTitle:@"Status Bar"
                         action:@selector(toggleStatusBar:)
                  keyEquivalent:@""];
+    [viewMenu addItemWithTitle:@"Show Line Numbers"
+                        action:@selector(toggleLineNumbers:)
+                 keyEquivalent:@""];
     [viewMenuItem setSubmenu:viewMenu];
     [menubar addItem:viewMenuItem];
 
-    // 6. Help Menu
+    // 6. Window Menu
+    NSMenuItem *windowMenuItem = [[NSMenuItem alloc] init];
+    NSMenu *windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
+    [windowMenu addItemWithTitle:@"Minimize"
+                          action:@selector(performMiniaturize:)
+                   keyEquivalent:@"m"];
+    [windowMenu addItemWithTitle:@"Zoom"
+                          action:@selector(performZoom:)
+                   keyEquivalent:@""];
+    [windowMenu addItem:[NSMenuItem separatorItem]];
+    [windowMenu addItemWithTitle:@"Bring All to Front"
+                          action:@selector(arrangeInFront:)
+                   keyEquivalent:@""];
+    [windowMenuItem setSubmenu:windowMenu];
+    [menubar addItem:windowMenuItem];
+    [NSApp setWindowsMenu:windowMenu];
+
+    // 7. Help Menu
     NSMenuItem *helpMenuItem = [[NSMenuItem alloc] init];
     NSMenu *helpMenu = [[NSMenu alloc] initWithTitle:@"Help"];
     [helpMenu addItemWithTitle:@"About Notepad"

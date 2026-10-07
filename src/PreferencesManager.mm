@@ -7,6 +7,7 @@ static NSString *const kNPFontSizeKey        = @"NP.fontSize";
 static NSString *const kNPTabWidthKey        = @"NP.tabWidth";
 static NSString *const kNPWordWrapKey        = @"NP.wordWrap";
 static NSString *const kNPShowLineNumbersKey = @"NP.showLineNumbers";
+static NSString *const kNPShowStatusBarKey   = @"NP.showStatusBar";
 
 @implementation PreferencesManager
 
@@ -35,7 +36,8 @@ static NSString *const kNPShowLineNumbersKey = @"NP.showLineNumbers";
         kNPFontSizeKey: @(12),
         kNPTabWidthKey: @(4),
         kNPWordWrapKey: @(NO),
-        kNPShowLineNumbersKey: @(NO)
+        kNPShowLineNumbersKey: @(NO),
+        kNPShowStatusBarKey: @(YES)
     };
     [defs registerDefaults:defaults];
 
@@ -44,6 +46,7 @@ static NSString *const kNPShowLineNumbersKey = @"NP.showLineNumbers";
     _tabWidth = [defs integerForKey:kNPTabWidthKey];
     _wordWrap = [defs boolForKey:kNPWordWrapKey];
     _showLineNumbers = [defs boolForKey:kNPShowLineNumbersKey];
+    _showStatusBar = [defs boolForKey:kNPShowStatusBarKey];
 }
 
 - (void)savePreferences {
@@ -53,6 +56,7 @@ static NSString *const kNPShowLineNumbersKey = @"NP.showLineNumbers";
     [defs setInteger:_tabWidth forKey:kNPTabWidthKey];
     [defs setBool:_wordWrap forKey:kNPWordWrapKey];
     [defs setBool:_showLineNumbers forKey:kNPShowLineNumbersKey];
+    [defs setBool:_showStatusBar forKey:kNPShowStatusBarKey];
     [defs synchronize];
 
     [[NSNotificationCenter defaultCenter] postNotificationName:NPPreferencesDidChangeNotification

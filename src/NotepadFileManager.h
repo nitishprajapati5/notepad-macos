@@ -8,10 +8,11 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)sharedManager;
 
-- (void)openDocumentInController:(NotepadWindowController *)controller;
+- (void)openDocumentInController:(nullable NotepadWindowController *)controller;
+- (void)openFileAtPath:(NSString *)path inController:(nullable NotepadWindowController *)controller;
 - (BOOL)saveController:(NotepadWindowController *)controller;
 - (BOOL)saveAsController:(NotepadWindowController *)controller;
-- (BOOL)revertController:(NotepadWindowController *)controller;
+- (void)revertController:(NotepadWindowController *)controller;
 
 @end
 

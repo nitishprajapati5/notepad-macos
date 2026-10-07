@@ -45,8 +45,9 @@ notepad/
     ├── ScintillaView+Notepad.{h,mm}   # Category adding Notepad styling & conveniences
     ├── StatusBarView.{h,mm}    # Fixed-cell status bar with native separators
     ├── FindReplaceController.{h,mm}   # Find and replace panel
+    ├── NotepadDocumentController.{h,mm} # Custom NSDocumentController for Open Recent
     ├── NotepadFileManager.{h,mm}      # File load/save operations & encoding detection
-    └── PreferencesManager.{h,mm}      # Persistent defaults (font, wrap, tabs)
+    └── PreferencesManager.{h,mm}      # Persistent defaults (font, wrap, tabs, status bar)
 ```
 
 ---
