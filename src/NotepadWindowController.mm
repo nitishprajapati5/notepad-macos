@@ -1,7 +1,9 @@
 #import "NotepadWindowController.h"
+#import "AppDelegate.h"
 #import "ScintillaView+Notepad.h"
 #import "StatusBarView.h"
 #import "FindReplaceController.h"
+#import "PreferencesManager.h"
 #import "Scintilla.h"
 
 @interface NotepadWindowController ()
@@ -22,6 +24,8 @@
                                                   backing:NSBackingStoreBuffered
                                                     defer:NO];
     [win center];
+    win.minSize = NSMakeSize(400, 200);
+    [win setFrameAutosaveName:@"NotepadMainWindow"];
 
     self = [super initWithWindow:win];
     if (self) {
@@ -34,6 +38,17 @@
         [self updateWindowTitle];
         [self updateStatusBar];
 
+        // Register appearance and preferences observers
+        [[NSDistributedNotificationCenter defaultCenter] addObserver:self
+                                                            selector:@selector(handleAppearanceChanged:)
+                                                                name:@"AppleInterfaceThemeChangedNotification"
+                                                              object:nil];
+
+        [[NSNotificationCenter defaultCenter] addObserver:self
+                                                 selector:@selector(handlePreferencesChanged:)
+                                                     name:NPPreferencesDidChangeNotification
+                                                   object:nil];
+
         if (_filePath) {
             [self loadFile:_filePath];
         }
@@ -41,10 +56,15 @@
     return self;
 }
 
+- (void)dealloc {
+    [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+}
+
 - (void)setupUIInWindow:(NSWindow *)window {
     NSView *contentView = window.contentView;
 
-    // Scintilla Editor
+    // Scintilla Editor (takes entire top area down to status bar)
     _editor = [[ScintillaView alloc] initWithFrame:contentView.bounds];
     _editor.translatesAutoresizingMaskIntoConstraints = NO;
     _editor.delegate = self;
@@ -69,15 +89,28 @@
         _statusBarHeightConstraint
     ]];
 
+    // Apply default theme and initial editor settings
     [_editor np_applyDefaultTheme];
-    // Plain text Notepad: default without margin numbers, word wrap off
-    [_editor np_setLineNumbersVisible:NO];
-    [_editor np_setWordWrap:NO];
+    [_editor message:SCI_SETSAVEPOINT];
+}
+
+- (void)handleAppearanceChanged:(NSNotification *)notification {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.editor np_applyDefaultTheme];
+        [self.statusBar setNeedsDisplay:YES];
+    });
+}
+
+- (void)handlePreferencesChanged:(NSNotification *)notification {
+    dispatch_async(dispatch_get_main_queue(), ^{
+        [self.editor np_applyDefaultTheme];
+        [self updateStatusBar];
+    });
 }
 
 - (void)updateWindowTitle {
     NSString *fileName = self.filePath ? [self.filePath lastPathComponent] : @"Untitled";
-    NSString *title = [NSString stringWithFormat:@"%@ - Notepad", fileName];
+    NSString *title = [NSString stringWithFormat:@"%@%@ - Notepad", self.isDirty ? @"*" : @"", fileName];
     [self.window setTitle:title];
     [self.window setDocumentEdited:self.isDirty];
 
@@ -91,7 +124,7 @@
 - (void)updateStatusBar {
     if (!self.editor || !self.statusBar) return;
 
-    // 1. Line & Column
+    // 1. Line & Column (1-based)
     long pos = [self.editor getGeneralProperty:SCI_GETCURRENTPOS];
     long line = [self.editor getGeneralProperty:SCI_LINEFROMPOSITION parameter:pos] + 1;
     long col = [self.editor getGeneralProperty:SCI_GETCOLUMN parameter:pos] + 1;
@@ -151,6 +184,7 @@
             [self.editor message:SCI_SETEOLMODE wParam:SC_EOL_CR lParam:0];
         }
 
+        [self.editor message:SCI_SETSAVEPOINT];
         self.isDirty = NO;
         [self updateWindowTitle];
         [self updateStatusBar];
@@ -167,16 +201,20 @@
 - (void)notification:(SCNotification *)notification {
     if (!notification) return;
 
-    if (notification->nmhdr.code == SCN_MODIFIED) {
-        int modType = notification->modificationType;
-        if ((modType & SC_MOD_INSERTTEXT) || (modType & SC_MOD_DELETETEXT)) {
-            if (!self.isDirty) {
-                self.isDirty = YES;
-                [self updateWindowTitle];
-            }
-        }
-    } else if (notification->nmhdr.code == SCN_UPDATEUI) {
-        [self updateStatusBar];
+    switch (notification->nmhdr.code) {
+        case SCN_SAVEPOINTREACHED:
+            self.isDirty = NO;
+            [self updateWindowTitle];
+            break;
+        case SCN_SAVEPOINTLEFT:
+            self.isDirty = YES;
+            [self updateWindowTitle];
+            break;
+        case SCN_UPDATEUI:
+            [self updateStatusBar];
+            break;
+        default:
+            break;
     }
 }
 
@@ -205,33 +243,31 @@
     }
 }
 
+- (void)windowWillClose:(NSNotification *)notification {
+    [[NSDistributedNotificationCenter defaultCenter] removeObserver:self];
+    [[NSNotificationCenter defaultCenter] removeObserver:self];
+
+    AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
+    if ([appDelegate respondsToSelector:@selector(removeWindowController:)]) {
+        [appDelegate removeWindowController:self];
+    }
+}
+
 #pragma mark - Actions
 
 - (IBAction)newDocument:(nullable id)sender {
-    NotepadWindowController *newController = [[NotepadWindowController alloc] initWithFilePath:nil];
-    [newController showWindow:nil];
+    AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
+    [appDelegate newDocument:sender];
 }
 
 - (IBAction)newWindow:(nullable id)sender {
-    [self newDocument:sender];
+    AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
+    [appDelegate newWindow:sender];
 }
 
 - (IBAction)openDocument:(nullable id)sender {
-    NSOpenPanel *panel = [NSOpenPanel openPanel];
-    panel.canChooseFiles = YES;
-    panel.canChooseDirectories = NO;
-    panel.allowsMultipleSelection = NO;
-
-    [panel beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse result) {
-        if (result == NSModalResponseOK && panel.URL.path) {
-            if (!self.filePath && !self.isDirty && [self.editor np_text].length == 0) {
-                [self loadFile:panel.URL.path];
-            } else {
-                NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:panel.URL.path];
-                [wc showWindow:nil];
-            }
-        }
-    }];
+    AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
+    [appDelegate openDocument:sender];
 }
 
 - (BOOL)saveFile {
@@ -247,6 +283,7 @@
                                   error:&error];
 
     if (success) {
+        [self.editor message:SCI_SETSAVEPOINT];
         self.isDirty = NO;
         [self updateWindowTitle];
         return YES;
@@ -321,12 +358,13 @@
     NSAlert *alert = [[NSAlert alloc] init];
     alert.messageText = @"Go To Line";
     alert.informativeText = @"Enter line number:";
-    [alert addButtonWithTitle:@"Go"];
+    [alert addButtonWithTitle:@"Go To"];
     [alert addButtonWithTitle:@"Cancel"];
 
     NSTextField *input = [[NSTextField alloc] initWithFrame:NSMakeRect(0, 0, 200, 24)];
     input.placeholderString = @"1";
     alert.accessoryView = input;
+    [alert.window setInitialFirstResponder:input];
 
     [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
         if (returnCode == NSAlertFirstButtonReturn) {
@@ -351,20 +389,32 @@
 - (IBAction)toggleWordWrap:(nullable id)sender {
     BOOL current = [self.editor np_wordWrap];
     [self.editor np_setWordWrap:!current];
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.wordWrap = !current;
+    [prefs savePreferences];
 }
 
 - (IBAction)chooseFont:(nullable id)sender {
     NSFontManager *fontManager = [NSFontManager sharedFontManager];
+    NSString *currentFontName = [self.editor np_fontName];
+    NSInteger currentFontSize = [self.editor np_fontSize];
+    NSFont *font = [NSFont fontWithName:currentFontName size:currentFontSize] ?: [NSFont systemFontOfSize:12.0];
+    [fontManager setSelectedFont:font isMultiple:NO];
     [fontManager orderFrontFontPanel:self];
 }
 
 - (void)changeFont:(id)sender {
     NSFontManager *fontManager = [NSFontManager sharedFontManager];
-    NSFont *font = [fontManager convertFont:[NSFont systemFontOfSize:13.0]];
-    if (font) {
-        [self.editor setStringProperty:SCI_STYLESETFONT parameter:STYLE_DEFAULT value:font.familyName];
-        [self.editor setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:(long)font.pointSize];
-        [self.editor message:SCI_STYLECLEARALL];
+    NSString *currentFontName = [self.editor np_fontName];
+    NSInteger currentFontSize = [self.editor np_fontSize];
+    NSFont *currentFont = [NSFont fontWithName:currentFontName size:currentFontSize] ?: [NSFont systemFontOfSize:12.0];
+    NSFont *newFont = [fontManager convertFont:currentFont];
+    if (newFont) {
+        [self.editor np_setFontName:newFont.fontName size:(NSInteger)newFont.pointSize];
+        PreferencesManager *prefs = [PreferencesManager sharedManager];
+        prefs.fontName = newFont.fontName;
+        prefs.fontSize = (NSInteger)newFont.pointSize;
+        [prefs savePreferences];
     }
 }
 
@@ -387,6 +437,7 @@
     BOOL isHidden = self.statusBar.isHidden;
     self.statusBar.hidden = !isHidden;
     _statusBarHeightConstraint.constant = isHidden ? 24.0 : 0.0;
+    [self.window.contentView layoutSubtreeIfNeeded];
 }
 
 @end

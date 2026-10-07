@@ -1,5 +1,6 @@
 #import "AppDelegate.h"
 #import "NotepadWindowController.h"
+#import "ScintillaView+Notepad.h"
 
 @implementation AppDelegate
 
@@ -20,9 +21,7 @@
 }
 
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename {
-    NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:filename];
-    [self.windowControllers addObject:wc];
-    [wc showWindow:nil];
+    [self openFileAtPath:filename];
     return YES;
 }
 
@@ -32,8 +31,54 @@
 
 - (void)newDocument:(nullable id)sender {
     NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:nil];
-    [self.windowControllers addObject:wc];
+    [self addWindowController:wc];
     [wc showWindow:nil];
+}
+
+- (void)newWindow:(nullable id)sender {
+    [self newDocument:sender];
+}
+
+- (void)openDocument:(nullable id)sender {
+    NSOpenPanel *panel = [NSOpenPanel openPanel];
+    panel.canChooseFiles = YES;
+    panel.canChooseDirectories = NO;
+    panel.allowsMultipleSelection = NO;
+
+    NSWindow *keyWindow = [NSApp keyWindow];
+    [panel beginSheetModalForWindow:keyWindow completionHandler:^(NSModalResponse result) {
+        if (result == NSModalResponseOK && panel.URL.path) {
+            [self openFileAtPath:panel.URL.path];
+        }
+    }];
+}
+
+- (void)openFileAtPath:(NSString *)filePath {
+    // If key window is clean & empty, open in it
+    NSWindowController *activeWC = [[NSApp keyWindow] windowController];
+    if ([activeWC isKindOfClass:[NotepadWindowController class]]) {
+        NotepadWindowController *notepadWC = (NotepadWindowController *)activeWC;
+        if (!notepadWC.filePath && !notepadWC.isDirty && [notepadWC.editor np_text].length == 0) {
+            [notepadWC loadFile:filePath];
+            return;
+        }
+    }
+
+    NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:filePath];
+    [self addWindowController:wc];
+    [wc showWindow:nil];
+}
+
+- (void)addWindowController:(NotepadWindowController *)controller {
+    if (controller && ![self.windowControllers containsObject:controller]) {
+        [self.windowControllers addObject:controller];
+    }
+}
+
+- (void)removeWindowController:(NotepadWindowController *)controller {
+    if (controller) {
+        [self.windowControllers removeObject:controller];
+    }
 }
 
 #pragma mark - Windows Notepad Menu Bar

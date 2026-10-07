@@ -5,6 +5,9 @@
 @property (nonatomic, strong) NSTextField *zoomLabel;
 @property (nonatomic, strong) NSTextField *eolLabel;
 @property (nonatomic, strong) NSTextField *encLabel;
+@property (nonatomic, strong) NSBox *sep1;
+@property (nonatomic, strong) NSBox *sep2;
+@property (nonatomic, strong) NSBox *sep3;
 @end
 
 @implementation StatusBarView
@@ -14,9 +17,8 @@
     if (self) {
         _cursorPositionText = @"Ln 1, Col 1";
         _zoomText = @"100%";
-        _eolText = @"Windows (CRLF)";
-        _encodingText = @"UTF-8";
         _eolText = @"Unix (LF)";
+        _encodingText = @"UTF-8";
 
         [self setupUI];
     }
@@ -26,34 +28,89 @@
 - (void)setupUI {
     self.wantsLayer = YES;
 
-    _posLabel = [self makeLabelWithText:_cursorPositionText alignment:NSTextAlignmentLeft];
-    _zoomLabel = [self makeLabelWithText:_zoomText alignment:NSTextAlignmentCenter];
-    _eolLabel = [self makeLabelWithText:_eolText alignment:NSTextAlignmentCenter];
-    _encLabel = [self makeLabelWithText:_encodingText alignment:NSTextAlignmentRight];
+    _posLabel = [self makeLabelWithText:_cursorPositionText alignment:NSTextAlignmentLeft monospaced:YES];
+    _zoomLabel = [self makeLabelWithText:_zoomText alignment:NSTextAlignmentCenter monospaced:YES];
+    _eolLabel = [self makeLabelWithText:_eolText alignment:NSTextAlignmentCenter monospaced:NO];
+    _encLabel = [self makeLabelWithText:_encodingText alignment:NSTextAlignmentCenter monospaced:NO];
 
-    NSStackView *stack = [NSStackView stackViewWithViews:@[_posLabel, _zoomLabel, _eolLabel, _encLabel]];
-    stack.orientation = NSUserInterfaceLayoutOrientationHorizontal;
-    stack.distribution = NSStackViewDistributionFillProportionally;
-    stack.translatesAutoresizingMaskIntoConstraints = NO;
-    stack.edgeInsets = NSEdgeInsetsMake(2, 16, 2, 16);
+    _sep1 = [self makeSeparator];
+    _sep2 = [self makeSeparator];
+    _sep3 = [self makeSeparator];
 
-    [self addSubview:stack];
+    [self addSubview:_posLabel];
+    [self addSubview:_sep1];
+    [self addSubview:_zoomLabel];
+    [self addSubview:_sep2];
+    [self addSubview:_eolLabel];
+    [self addSubview:_sep3];
+    [self addSubview:_encLabel];
 
     [NSLayoutConstraint activateConstraints:@[
-        [stack.topAnchor constraintEqualToAnchor:self.topAnchor],
-        [stack.bottomAnchor constraintEqualToAnchor:self.bottomAnchor],
-        [stack.leadingAnchor constraintEqualToAnchor:self.leadingAnchor],
-        [stack.trailingAnchor constraintEqualToAnchor:self.trailingAnchor],
-        [self.heightAnchor constraintEqualToConstant:24.0]
+        // Status Bar fixed height
+        [self.heightAnchor constraintEqualToConstant:24.0],
+
+        // 1. Position Label (flexible left section)
+        [_posLabel.leadingAnchor constraintEqualToAnchor:self.leadingAnchor constant:14.0],
+        [_posLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
+        [_posLabel.trailingAnchor constraintEqualToAnchor:_sep1.leadingAnchor constant:-8.0],
+
+        // Separator 1
+        [_sep1.trailingAnchor constraintEqualToAnchor:_zoomLabel.leadingAnchor constant:-8.0],
+        [_sep1.topAnchor constraintEqualToAnchor:self.topAnchor constant:4.0],
+        [_sep1.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4.0],
+        [_sep1.widthAnchor constraintEqualToConstant:1.0],
+
+        // 2. Zoom Label (fixed width 64pt)
+        [_zoomLabel.widthAnchor constraintEqualToConstant:64.0],
+        [_zoomLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
+        [_zoomLabel.trailingAnchor constraintEqualToAnchor:_sep2.leadingAnchor constant:-8.0],
+
+        // Separator 2
+        [_sep2.trailingAnchor constraintEqualToAnchor:_eolLabel.leadingAnchor constant:-8.0],
+        [_sep2.topAnchor constraintEqualToAnchor:self.topAnchor constant:4.0],
+        [_sep2.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4.0],
+        [_sep2.widthAnchor constraintEqualToConstant:1.0],
+
+        // 3. EOL Mode Label (fixed width 120pt)
+        [_eolLabel.widthAnchor constraintEqualToConstant:120.0],
+        [_eolLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
+        [_eolLabel.trailingAnchor constraintEqualToAnchor:_sep3.leadingAnchor constant:-8.0],
+
+        // Separator 3
+        [_sep3.trailingAnchor constraintEqualToAnchor:_encLabel.leadingAnchor constant:-8.0],
+        [_sep3.topAnchor constraintEqualToAnchor:self.topAnchor constant:4.0],
+        [_sep3.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4.0],
+        [_sep3.widthAnchor constraintEqualToConstant:1.0],
+
+        // 4. Encoding Label (fixed width 96pt)
+        [_encLabel.widthAnchor constraintEqualToConstant:96.0],
+        [_encLabel.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
+        [_encLabel.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-14.0]
     ]];
 }
 
-- (NSTextField *)makeLabelWithText:(NSString *)text alignment:(NSTextAlignment)alignment {
+- (NSTextField *)makeLabelWithText:(NSString *)text alignment:(NSTextAlignment)alignment monospaced:(BOOL)monospaced {
     NSTextField *label = [NSTextField labelWithString:text];
-    label.font = [NSFont systemFontOfSize:11.0 weight:NSFontWeightRegular];
+    if (monospaced) {
+        if (@available(macOS 10.15, *)) {
+            label.font = [NSFont monospacedDigitSystemFontOfSize:11.0 weight:NSFontWeightRegular];
+        } else {
+            label.font = [NSFont systemFontOfSize:11.0 weight:NSFontWeightRegular];
+        }
+    } else {
+        label.font = [NSFont systemFontOfSize:11.0 weight:NSFontWeightRegular];
+    }
     label.textColor = [NSColor secondaryLabelColor];
     label.alignment = alignment;
+    label.translatesAutoresizingMaskIntoConstraints = NO;
     return label;
+}
+
+- (NSBox *)makeSeparator {
+    NSBox *box = [[NSBox alloc] init];
+    box.boxType = NSBoxSeparator;
+    box.translatesAutoresizingMaskIntoConstraints = NO;
+    return box;
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -62,10 +119,14 @@
     [[NSColor windowBackgroundColor] setFill];
     NSRectFill(dirtyRect);
 
-    // Top border separator line
+    // Subtle 1px top border line
     [[NSColor separatorColor] setStroke];
-    [NSBezierPath strokeLineFromPoint:NSMakePoint(dirtyRect.origin.x, NSMaxY(self.bounds) - 0.5)
-                              toPoint:NSMakePoint(NSMaxX(dirtyRect), NSMaxY(self.bounds) - 0.5)];
+    NSBezierPath *topBorder = [NSBezierPath bezierPath];
+    CGFloat y = NSMaxY(self.bounds) - 0.5;
+    [topBorder moveToPoint:NSMakePoint(dirtyRect.origin.x, y)];
+    [topBorder lineToPoint:NSMakePoint(NSMaxX(dirtyRect), y)];
+    [topBorder setLineWidth:1.0];
+    [topBorder stroke];
 }
 
 - (void)updateLine:(NSInteger)line column:(NSInteger)column {

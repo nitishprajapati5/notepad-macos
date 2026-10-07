@@ -1,4 +1,5 @@
 #import "ScintillaView+Notepad.h"
+#import "PreferencesManager.h"
 #import "Scintilla.h"
 
 @implementation ScintillaView (Notepad)
@@ -15,20 +16,27 @@
 - (void)np_applyDefaultTheme {
     [self suspendDrawing:YES];
 
-    // Default font & size
-    NSString *fontName = @"Menlo";
-    if (@available(macOS 10.15, *)) {
-        NSFont *sfMono = [NSFont fontWithName:@"SF Mono" size:13.0];
-        if (sfMono) {
-            fontName = @"SF Mono";
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    NSString *fontName = prefs.fontName ?: @"Menlo";
+    NSInteger fontSize = prefs.fontSize > 0 ? prefs.fontSize : 12;
+
+    // Check if SF Mono is preferred/available
+    if ([fontName isEqualToString:@"SF Mono"]) {
+        if (@available(macOS 10.15, *)) {
+            NSFont *sfMono = [NSFont fontWithName:@"SF Mono" size:fontSize];
+            if (!sfMono) {
+                fontName = @"Menlo";
+            }
+        } else {
+            fontName = @"Menlo";
         }
     }
-    
+
     [self setStringProperty:SCI_STYLESETFONT parameter:STYLE_DEFAULT value:fontName];
-    [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:13];
+    [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:fontSize];
 
     // Dynamic appearance colors
-    NSAppearance *appearance = [NSApp effectiveAppearance];
+    NSAppearance *appearance = self.effectiveAppearance ?: [NSApp effectiveAppearance];
     BOOL isDark = NO;
     if (@available(macOS 10.14, *)) {
         NSAppearanceName match = [appearance bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
@@ -53,15 +61,23 @@
 
     [self message:SCI_STYLECLEARALL];
 
-    // Caret line & indentation setup
+    // Native selection highlight
+    [self setColorProperty:SCI_SETSELBACK parameter:1 value:[NSColor selectedTextBackgroundColor]];
+
+    // Caret appearance & line highlight
     [self message:SCI_SETCARETLINEVISIBLE wParam:1 lParam:0];
-    [self message:SCI_SETTABWIDTH wParam:4 lParam:0];
-    [self message:SCI_SETUSETABS wParam:0 lParam:0];
+    [self message:SCI_SETCARETWIDTH wParam:2 lParam:0];
+
+    // Tab & EOL setup (Phase 2.2 defaults: tab width 4, use tabs, EOL LF)
+    NSInteger tabWidth = prefs.tabWidth > 0 ? prefs.tabWidth : 4;
+    [self message:SCI_SETTABWIDTH wParam:tabWidth lParam:0];
+    [self message:SCI_SETUSETABS wParam:1 lParam:0]; // Use spaces: false -> use tabs
     [self message:SCI_SETEOLMODE wParam:SC_EOL_LF lParam:0];
     [self message:SCI_SETVIEWEOL wParam:0 lParam:0];
 
-    // Line number margin default
-    [self np_setLineNumbersVisible:YES];
+    // Margin & Wrap defaults from preferences
+    [self np_setLineNumbersVisible:prefs.showLineNumbers];
+    [self np_setWordWrap:prefs.wordWrap];
 
     [self suspendDrawing:NO];
 }
@@ -85,6 +101,30 @@
 
 - (BOOL)np_lineNumbersVisible {
     return [self getGeneralProperty:SCI_GETMARGINWIDTHN parameter:0] > 0;
+}
+
+- (void)np_setFontName:(NSString *)fontName size:(NSInteger)pointSize {
+    [self suspendDrawing:YES];
+    [self setStringProperty:SCI_STYLESETFONT parameter:STYLE_DEFAULT value:fontName];
+    [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:pointSize];
+    [self message:SCI_STYLECLEARALL];
+    [self suspendDrawing:NO];
+}
+
+- (NSString *)np_fontName {
+    return [self getStringProperty:SCI_STYLEGETFONT parameter:STYLE_DEFAULT] ?: @"Menlo";
+}
+
+- (NSInteger)np_fontSize {
+    return [self getGeneralProperty:SCI_STYLEGETSIZE parameter:STYLE_DEFAULT];
+}
+
+- (void)np_setTabWidth:(NSInteger)tabWidth {
+    [self message:SCI_SETTABWIDTH wParam:tabWidth lParam:0];
+}
+
+- (NSInteger)np_tabWidth {
+    return [self message:SCI_GETTABWIDTH];
 }
 
 @end

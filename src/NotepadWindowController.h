@@ -16,6 +16,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSStringEncoding encoding;
 
 - (instancetype)initWithFilePath:(nullable NSString *)filePath;
+- (void)loadFile:(NSString *)path;
 - (void)updateWindowTitle;
 - (void)updateStatusBar;
 

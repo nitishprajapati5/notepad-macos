@@ -32,10 +32,10 @@ static NSString *const kNPShowLineNumbersKey = @"NP.showLineNumbers";
 
     NSDictionary *defaults = @{
         kNPFontNameKey: @"Menlo",
-        kNPFontSizeKey: @(13),
+        kNPFontSizeKey: @(12),
         kNPTabWidthKey: @(4),
         kNPWordWrapKey: @(NO),
-        kNPShowLineNumbersKey: @(YES)
+        kNPShowLineNumbersKey: @(NO)
     };
     [defs registerDefaults:defaults];
 
