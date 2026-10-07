@@ -149,6 +149,12 @@
         normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
         normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\r" withString:@"\n"];
         normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\n" withString:@"\r\n"];
+    } else if (eolMode == SC_EOL_CR) {
+        normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
+        normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\n" withString:@"\r"];
+    } else { // SC_EOL_LF
+        normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
+        normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\r" withString:@"\n"];
     }
 
     BOOL success = [normalizedContent writeToFile:controller.filePath
@@ -175,6 +181,8 @@
 - (BOOL)saveAsController:(NotepadWindowController *)controller {
     NSSavePanel *panel = [NSSavePanel savePanel];
     panel.canCreateDirectories = YES;
+    panel.allowedFileTypes = @[@"txt", @"text", @"md", @"log"];
+    panel.allowsOtherFileTypes = YES;
     if (controller.filePath) {
         panel.directoryURL = [NSURL fileURLWithPath:[controller.filePath stringByDeletingLastPathComponent]];
         panel.nameFieldStringValue = [controller.filePath lastPathComponent];

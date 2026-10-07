@@ -1464,6 +1464,8 @@ static NSCursor *cursorFromEnum(Window::Cursor cursor) {
 		// (horizontal or vertical).
 		NSRect scrollerRect = NSMakeRect(0, 0, 100, 10);
 		scrollView = (NSScrollView *)[[SCIScrollView alloc] initWithFrame: scrollerRect];
+		scrollView.drawsBackground = NO;
+		scrollView.contentView.drawsBackground = NO;
 #if defined(MAC_OS_X_VERSION_10_14)
 		// Let SCIScrollView account for other subviews such as vertical ruler by turning off
 		// automaticallyAdjustsContentInsets.

@@ -26,8 +26,6 @@
 }
 
 - (void)setupUI {
-    self.wantsLayer = YES;
-
     _posLabel = [self makeLabelWithText:_cursorPositionText alignment:NSTextAlignmentLeft monospaced:YES];
     _zoomLabel = [self makeLabelWithText:_zoomText alignment:NSTextAlignmentCenter monospaced:YES];
     _eolLabel = [self makeLabelWithText:_eolText alignment:NSTextAlignmentCenter monospaced:NO];

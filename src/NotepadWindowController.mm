@@ -8,7 +8,6 @@
 #import "Scintilla.h"
 
 @interface NotepadWindowController ()
-@property (nonatomic, strong) NSLayoutConstraint *statusBarHeightConstraint;
 @end
 
 @implementation NotepadWindowController
@@ -35,7 +34,6 @@
     self = [super initWithWindow:win];
     if (self) {
         _filePath = [filePath copy];
-        _isDirty = NO;
         _encoding = NSUTF8StringEncoding;
         win.delegate = self;
 
@@ -68,33 +66,24 @@
 
 - (void)setupUIInWindow:(NSWindow *)window {
     NSView *contentView = window.contentView;
-
-    // Scintilla Editor (takes entire top area down to status bar)
-    _editor = [[ScintillaView alloc] initWithFrame:contentView.bounds];
-    _editor.translatesAutoresizingMaskIntoConstraints = NO;
-    _editor.delegate = self;
-    [contentView addSubview:_editor];
-
-    // Status Bar (pinned to bottom like Windows Notepad)
-    _statusBar = [[StatusBarView alloc] initWithFrame:NSMakeRect(0, 0, contentView.bounds.size.width, 24)];
-    _statusBar.translatesAutoresizingMaskIntoConstraints = NO;
-    [contentView addSubview:_statusBar];
+    contentView.autoresizesSubviews = YES;
 
     BOOL showStatusBar = [PreferencesManager sharedManager].showStatusBar;
+    CGFloat sbHeight = showStatusBar ? 24.0 : 0.0;
+
+    // Status Bar (pinned to bottom like Windows Notepad)
+    _statusBar = [[StatusBarView alloc] initWithFrame:NSMakeRect(0, 0, contentView.bounds.size.width, sbHeight)];
+    _statusBar.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     _statusBar.hidden = !showStatusBar;
-    _statusBarHeightConstraint = [_statusBar.heightAnchor constraintEqualToConstant:showStatusBar ? 24.0 : 0.0];
+    [contentView addSubview:_statusBar];
 
-    [NSLayoutConstraint activateConstraints:@[
-        [_editor.topAnchor constraintEqualToAnchor:contentView.topAnchor],
-        [_editor.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
-        [_editor.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
-        [_editor.bottomAnchor constraintEqualToAnchor:_statusBar.topAnchor],
-
-        [_statusBar.leadingAnchor constraintEqualToAnchor:contentView.leadingAnchor],
-        [_statusBar.trailingAnchor constraintEqualToAnchor:contentView.trailingAnchor],
-        [_statusBar.bottomAnchor constraintEqualToAnchor:contentView.bottomAnchor],
-        _statusBarHeightConstraint
-    ]];
+    // Scintilla Editor (takes entire area above status bar)
+    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width, contentView.bounds.size.height - sbHeight);
+    _editor = [[ScintillaView alloc] initWithFrame:editorFrame];
+    _editor.autoresizesSubviews = YES;
+    _editor.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    _editor.delegate = self;
+    [contentView addSubview:_editor];
 
     if (@available(macOS 10.14, *)) {
         NSAppearance *aqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
@@ -106,6 +95,7 @@
     // Apply default theme and initial editor settings
     [_editor np_applyDefaultTheme];
     [_editor message:SCI_SETSAVEPOINT];
+
 }
 
 - (void)handleAppearanceChanged:(NSNotification *)notification {
@@ -177,16 +167,26 @@
 
 #pragma mark - Scintilla Notifications
 
+- (BOOL)isDirty {
+    if (!self.editor) return NO;
+    return [self.editor getGeneralProperty:SCI_GETMODIFY] != 0;
+}
+
+- (void)setIsDirty:(BOOL)isDirty {
+    if (!isDirty && self.editor) {
+        [self.editor message:SCI_SETSAVEPOINT];
+    }
+    [self updateWindowTitle];
+}
+
+#pragma mark - Scintilla Notifications
+
 - (void)notification:(SCNotification *)notification {
     if (!notification) return;
 
     switch (notification->nmhdr.code) {
         case SCN_SAVEPOINTREACHED:
-            self.isDirty = NO;
-            [self updateWindowTitle];
-            break;
         case SCN_SAVEPOINTLEFT:
-            self.isDirty = YES;
             [self updateWindowTitle];
             break;
         case SCN_UPDATEUI:
@@ -268,10 +268,78 @@
     [[NotepadFileManager sharedManager] revertController:self];
 }
 
+- (IBAction)runPageSpec:(nullable id)sender {
+    [self runPageLayout:sender];
+}
+
+- (IBAction)runPageLayout:(nullable id)sender {
+    NSPageLayout *pageLayout = [NSPageLayout pageLayout];
+    [pageLayout beginSheetWithPrintInfo:[NSPrintInfo sharedPrintInfo]
+                         modalForWindow:self.window
+                               delegate:nil
+                         didEndSelector:NULL
+                            contextInfo:NULL];
+}
+
 - (IBAction)printDocument:(nullable id)sender {
     NSPrintInfo *printInfo = [NSPrintInfo sharedPrintInfo];
-    NSPrintOperation *op = [NSPrintOperation printOperationWithView:self.editor printInfo:printInfo];
+    [printInfo setHorizontalPagination:NSPrintingPaginationModeFit];
+    [printInfo setVerticalPagination:NSPrintingPaginationModeAutomatic];
+
+    NSRect printRect = NSMakeRect(0, 0, printInfo.paperSize.width - printInfo.leftMargin - printInfo.rightMargin,
+                                       printInfo.paperSize.height - printInfo.topMargin - printInfo.bottomMargin);
+    NSTextView *printView = [[NSTextView alloc] initWithFrame:printRect];
+    NSString *text = [self.editor np_text];
+    NSString *fontName = [self.editor np_fontName];
+    NSInteger fontSize = [self.editor np_fontSize];
+    NSFont *font = [NSFont fontWithName:fontName size:fontSize] ?: [NSFont monospacedSystemFontOfSize:11.0 weight:NSFontWeightRegular];
+    [printView setFont:font];
+    [printView setString:text ?: @""];
+    [printView setHorizontallyResizable:NO];
+    [printView setVerticallyResizable:YES];
+    [[printView textContainer] setWidthTracksTextView:YES];
+    [[printView textContainer] setContainerSize:NSMakeSize(printRect.size.width, CGFLOAT_MAX)];
+
+    NSPrintOperation *op = [NSPrintOperation printOperationWithView:printView printInfo:printInfo];
+    [op setShowsPrintPanel:YES];
+    [op setShowsProgressPanel:YES];
     [op runOperationModalForWindow:self.window delegate:nil didRunSelector:NULL contextInfo:NULL];
+}
+
+- (IBAction)undo:(nullable id)sender {
+    [self.editor message:SCI_UNDO];
+    [self updateStatusBar];
+}
+
+- (IBAction)redo:(nullable id)sender {
+    [self.editor message:SCI_REDO];
+    [self updateStatusBar];
+}
+
+- (IBAction)cut:(nullable id)sender {
+    [self.editor message:SCI_CUT];
+    [self updateStatusBar];
+}
+
+- (IBAction)copy:(nullable id)sender {
+    [self.editor message:SCI_COPY];
+}
+
+- (IBAction)paste:(nullable id)sender {
+    [self.editor message:SCI_PASTE];
+    [self updateStatusBar];
+}
+
+- (IBAction)delete:(nullable id)sender {
+    if ([self.editor getGeneralProperty:SCI_GETSELECTIONSTART] != [self.editor getGeneralProperty:SCI_GETSELECTIONEND]) {
+        [self.editor message:SCI_CLEAR];
+    } else {
+        [self.editor message:SCI_DELETEBACK];
+    }
+}
+
+- (IBAction)selectAll:(nullable id)sender {
+    [self.editor message:SCI_SELECTALL];
 }
 
 - (IBAction)showFind:(nullable id)sender {
@@ -330,7 +398,11 @@
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     [formatter setDateFormat:@"h:mm a M/d/yyyy"];
     NSString *dateStr = [formatter stringFromDate:[NSDate date]];
-    [self.editor insertText:dateStr];
+    if (dateStr) {
+        [self.editor message:SCI_REPLACESEL wParam:0 lParam:(sptr_t)[dateStr UTF8String]];
+        [self.editor message:SCI_SCROLLCARET];
+        [self updateStatusBar];
+    }
 }
 
 - (IBAction)toggleWordWrap:(nullable id)sender {
@@ -383,11 +455,19 @@
 - (IBAction)toggleStatusBar:(nullable id)sender {
     BOOL isHidden = self.statusBar.isHidden;
     self.statusBar.hidden = !isHidden;
-    self.statusBarHeightConstraint.constant = isHidden ? 24.0 : 0.0;
-    [self.window.contentView layoutSubtreeIfNeeded];
+    [self layoutSubviews];
     PreferencesManager *prefs = [PreferencesManager sharedManager];
     prefs.showStatusBar = isHidden;
     [prefs savePreferences];
+}
+
+- (void)layoutSubviews {
+    if (!self.editor || !self.statusBar) return;
+    NSRect bounds = self.window.contentView.bounds;
+    BOOL showStatusBar = !self.statusBar.isHidden;
+    CGFloat sbHeight = showStatusBar ? 24.0 : 0.0;
+    self.statusBar.frame = NSMakeRect(0, 0, bounds.size.width, sbHeight);
+    self.editor.frame = NSMakeRect(0, sbHeight, bounds.size.width, bounds.size.height - sbHeight);
 }
 
 - (IBAction)toggleLineNumbers:(nullable id)sender {
@@ -403,7 +483,10 @@
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
     SEL action = menuItem.action;
     if (action == @selector(saveDocument:)) {
-        return self.isDirty;
+        return self.isDirty || self.filePath == nil;
+    }
+    if (action == @selector(saveDocumentAs:)) {
+        return YES;
     }
     if (action == @selector(revertDocument:)) {
         return self.filePath != nil && self.isDirty;
@@ -416,6 +499,15 @@
     }
     if (action == @selector(cut:) || action == @selector(copy:)) {
         return [self.editor getGeneralProperty:SCI_GETSELECTIONSTART] != [self.editor getGeneralProperty:SCI_GETSELECTIONEND];
+    }
+    if (action == @selector(paste:)) {
+        return [self.editor message:SCI_CANPASTE] != 0;
+    }
+    if (action == @selector(delete:)) {
+        return [self.editor message:SCI_GETLENGTH] > 0;
+    }
+    if (action == @selector(selectAll:)) {
+        return [self.editor message:SCI_GETLENGTH] > 0;
     }
     if (action == @selector(toggleWordWrap:)) {
         menuItem.state = [self.editor np_wordWrap] ? NSControlStateValueOn : NSControlStateValueOff;
@@ -431,6 +523,12 @@
     }
     if (action == @selector(restoreDefaultZoom:)) {
         return [self.editor getGeneralProperty:SCI_GETZOOM] != 0;
+    }
+    if (action == @selector(runPageSpec:) || action == @selector(runPageLayout:)) {
+        return YES;
+    }
+    if (action == @selector(printDocument:)) {
+        return YES;
     }
     return YES;
 }

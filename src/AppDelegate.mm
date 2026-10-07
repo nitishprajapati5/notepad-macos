@@ -39,6 +39,27 @@
     return NO;
 }
 
+- (BOOL)applicationShouldHandleReopen:(NSApplication *)sender hasVisibleWindows:(BOOL)flag {
+    if (!flag) {
+        [self newDocument:nil];
+    }
+    return YES;
+}
+
+- (IBAction)runPageSpec:(nullable id)sender {
+    NSPageLayout *pageLayout = [NSPageLayout pageLayout];
+    NSWindow *keyWin = [NSApp keyWindow];
+    if (keyWin) {
+        [pageLayout beginSheetWithPrintInfo:[NSPrintInfo sharedPrintInfo]
+                             modalForWindow:keyWin
+                                   delegate:nil
+                             didEndSelector:NULL
+                                contextInfo:NULL];
+    } else {
+        [pageLayout runModalWithPrintInfo:[NSPrintInfo sharedPrintInfo]];
+    }
+}
+
 - (void)newDocument:(nullable id)sender {
     NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:nil];
     [self addWindowController:wc];
@@ -84,6 +105,10 @@
     [appMenu addItemWithTitle:@"About Notepad"
                        action:@selector(orderFrontStandardAboutPanel:)
                 keyEquivalent:@""];
+    [appMenu addItem:[NSMenuItem separatorItem]];
+    [appMenu addItemWithTitle:@"Preferences…"
+                       action:@selector(chooseFont:)
+                keyEquivalent:@","];
     [appMenu addItem:[NSMenuItem separatorItem]];
     [appMenu addItemWithTitle:@"Hide Notepad"
                        action:@selector(hide:)
@@ -185,9 +210,10 @@
                                                 action:@selector(findPrevious:)
                                          keyEquivalent:@"G"];
     [findPrev setKeyEquivalentModifierMask:(NSEventModifierFlagShift | NSEventModifierFlagCommand)];
-    [editMenu addItemWithTitle:@"Replace…"
-                        action:@selector(showReplace:)
-                 keyEquivalent:@"h"];
+    NSMenuItem *replaceItem = [editMenu addItemWithTitle:@"Replace…"
+                                                  action:@selector(showReplace:)
+                                           keyEquivalent:@"f"];
+    [replaceItem setKeyEquivalentModifierMask:(NSEventModifierFlagOption | NSEventModifierFlagCommand)];
     [editMenu addItemWithTitle:@"Go To…"
                         action:@selector(goToLine:)
                  keyEquivalent:@"l"];

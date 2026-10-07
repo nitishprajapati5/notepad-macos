@@ -30,7 +30,17 @@ NS_ASSUME_NONNULL_BEGIN
 - (IBAction)saveDocument:(nullable id)sender;
 - (IBAction)saveDocumentAs:(nullable id)sender;
 - (IBAction)revertDocument:(nullable id)sender;
+- (IBAction)runPageSpec:(nullable id)sender;
+- (IBAction)runPageLayout:(nullable id)sender;
 - (IBAction)printDocument:(nullable id)sender;
+
+- (IBAction)undo:(nullable id)sender;
+- (IBAction)redo:(nullable id)sender;
+- (IBAction)cut:(nullable id)sender;
+- (IBAction)copy:(nullable id)sender;
+- (IBAction)paste:(nullable id)sender;
+- (IBAction)delete:(nullable id)sender;
+- (IBAction)selectAll:(nullable id)sender;
 
 - (IBAction)showFind:(nullable id)sender;
 - (IBAction)showReplace:(nullable id)sender;
