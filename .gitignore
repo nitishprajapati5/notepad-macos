@@ -1,0 +1,61 @@
+# Build output & artifacts
+build/
+build-*/
+build_*/
+*.app/
+DerivedData/
+xcuserdata/
+
+# Compiled objects & binaries
+*.o
+*.obj
+*.a
+*.dylib
+*.dSYM/
+
+# Generated CMake files & compilation databases
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+compile_commands.json
+CMakeUserPresets.json
+
+# Tooling & IDE cache
+.cache/
+.vscode/
+.idea/
+.claude/
+
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+
+# Downloaded archives & disk images
+downloads/
+*.dmg
+*.tar.gz
+*.tgz
+*.zip
+
+# Temporary, backup & editor files
+tmp/
+*.swp
+*.swo
+*.orig
+*.rej
+*.bak
+*~
+
+# macOS system files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+
+# Code signing & security (never commit secrets)
+*.p12
+*.cer
+*.certSigningRequest
+*.provisionprofile
+signing-config.sh

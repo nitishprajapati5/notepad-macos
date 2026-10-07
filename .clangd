@@ -1,0 +1,9 @@
+CompileFlags:
+  CompilationDatabase: "."
+  Add:
+    - -Iscintilla/include
+    - -Iscintilla/src
+    - -Iscintilla/cocoa
+    - -Isrc
+    - -fobjc-arc
+    - -std=c++17
