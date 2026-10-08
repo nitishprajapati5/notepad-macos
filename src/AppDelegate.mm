@@ -19,6 +19,11 @@
 - (void)applicationDidFinishLaunching:(NSNotification *)aNotification {
     [self createMainMenu];
 
+    NSImage *appIcon = [[NSBundle mainBundle] imageForResource:@"AppIcon"];
+    if (appIcon) {
+        [NSApp setApplicationIconImage:appIcon];
+    }
+
     if (self.windowControllers.count == 0) {
         [self newDocument:nil];
     }

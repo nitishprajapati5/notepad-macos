@@ -2,6 +2,7 @@
 
 @interface EmptyDocumentOverlayView ()
 @property (nonatomic, strong) NSStackView *stackView;
+@property (nonatomic, strong) NSImageView *iconView;
 @property (nonatomic, strong) NSTextField *titleLabel;
 @property (nonatomic, strong) NSTextField *shortcutsLabel;
 @property (nonatomic, strong) NSTextField *prefsLabel;
@@ -32,6 +33,13 @@
     _stackView.spacing = 10.0;
     _stackView.translatesAutoresizingMaskIntoConstraints = NO;
     [self addSubview:_stackView];
+
+    // Icon: Lucide Notepad-Text vector symbol
+    _iconView = [NSImageView imageViewWithImage:[self createLucideNotepadIconWithSize:NSMakeSize(48, 48)]];
+    _iconView.contentTintColor = [NSColor tertiaryLabelColor];
+    _iconView.translatesAutoresizingMaskIntoConstraints = NO;
+    [_stackView addArrangedSubview:_iconView];
+    [_stackView setCustomSpacing:12.0 afterView:_iconView];
 
     // 1. "Empty document"
     _titleLabel = [self makeLabelWithText:@"Empty document"
@@ -89,7 +97,60 @@
     return label;
 }
 
+- (NSImage *)createLucideNotepadIconWithSize:(NSSize)size {
+    NSImage *image = [NSImage imageWithSize:size flipped:NO drawingHandler:^BOOL(NSRect dstRect) {
+        CGFloat w = dstRect.size.width;
+        CGFloat unit = w / 24.0;
+        CGFloat strokeW = 1.75 * unit;
+
+        auto svgX = [&](CGFloat x) { return x * unit; };
+        auto svgY = [&](CGFloat y) { return (24.0 - y) * unit; };
+
+        // Outer notepad body rect: rect width=16 height=18 x=4 y=4 rx=2
+        NSRect r = NSMakeRect(svgX(4.0), svgY(22.0), 16.0 * unit, 18.0 * unit);
+        NSBezierPath *page = [NSBezierPath bezierPathWithRoundedRect:r xRadius:2.0 * unit yRadius:2.0 * unit];
+        page.lineWidth = strokeW;
+        page.lineCapStyle = NSLineCapStyleRound;
+        page.lineJoinStyle = NSLineJoinStyleRound;
+        [[NSColor secondaryLabelColor] setStroke];
+        [page stroke];
+
+        // Top clips: M8 2v4, M12 2v4, M16 2v4
+        CGFloat clips[] = { 8.0, 12.0, 16.0 };
+        for (int i = 0; i < 3; i++) {
+            NSBezierPath *clip = [NSBezierPath bezierPath];
+            [clip moveToPoint:NSMakePoint(svgX(clips[i]), svgY(2.0))];
+            [clip lineToPoint:NSMakePoint(svgX(clips[i]), svgY(6.0))];
+            clip.lineWidth = strokeW;
+            clip.lineCapStyle = NSLineCapStyleRound;
+            [[NSColor secondaryLabelColor] setStroke];
+            [clip stroke];
+        }
+
+        // Text lines: M8 10h6, M8 14h8, M8 18h5
+        struct { CGFloat x1, y, x2; } textLines[] = {
+            { 8.0, 10.0, 14.0 },
+            { 8.0, 14.0, 16.0 },
+            { 8.0, 18.0, 13.0 }
+        };
+        for (int i = 0; i < 3; i++) {
+            NSBezierPath *tl = [NSBezierPath bezierPath];
+            [tl moveToPoint:NSMakePoint(svgX(textLines[i].x1), svgY(textLines[i].y))];
+            [tl lineToPoint:NSMakePoint(svgX(textLines[i].x2), svgY(textLines[i].y))];
+            tl.lineWidth = strokeW;
+            tl.lineCapStyle = NSLineCapStyleRound;
+            [[NSColor secondaryLabelColor] setStroke];
+            [tl stroke];
+        }
+
+        return YES;
+    }];
+    [image setTemplate:YES];
+    return image;
+}
+
 - (void)updateTheme {
+    _iconView.contentTintColor = [NSColor tertiaryLabelColor];
     _titleLabel.textColor = [NSColor secondaryLabelColor];
     _shortcutsLabel.textColor = [NSColor secondaryLabelColor];
     _prefsLabel.textColor = [NSColor secondaryLabelColor];

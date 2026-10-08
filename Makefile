@@ -64,7 +64,7 @@ ALL_OBJS    = $(SCI_OBJS) $(COCOA_OBJS) $(APP_OBJS)
 
 all: $(BUNDLE_DIR)
 
-$(BUNDLE_DIR): $(MACOS_DIR)/$(APP_NAME) $(CONTENTS_DIR)/Info.plist
+$(BUNDLE_DIR): $(MACOS_DIR)/$(APP_NAME) $(CONTENTS_DIR)/Info.plist $(RESOURCES_DIR)/AppIcon.icns
 	@echo "✅ Built $(BUNDLE_DIR)"
 
 # Link Executable
@@ -72,10 +72,14 @@ $(MACOS_DIR)/$(APP_NAME): $(ALL_OBJS) | $(MACOS_DIR)
 	@echo "🔗 Linking $(APP_NAME) (Universal: arm64 + x86_64)..."
 	$(OBJCXX) $(ARCH_FLAGS) $(FRAMEWORKS) -stdlib=libc++ -fobjc-arc -o $@ $(ALL_OBJS)
 
-# Bundle Info.plist and Scintilla resources
+# Bundle Info.plist and resources
 $(CONTENTS_DIR)/Info.plist: resources/Info.plist | $(CONTENTS_DIR) $(RESOURCES_DIR)
 	cp $< $@
 	@cp -f scintilla/cocoa/res/*.png $(RESOURCES_DIR)/ 2>/dev/null || true
+	@cp -f resources/*.icns $(RESOURCES_DIR)/ 2>/dev/null || true
+
+$(RESOURCES_DIR)/AppIcon.icns: resources/AppIcon.icns | $(RESOURCES_DIR)
+	@cp -f $< $@
 
 # ==============================================================================
 # Compilation Rules
