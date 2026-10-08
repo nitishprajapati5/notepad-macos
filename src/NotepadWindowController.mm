@@ -191,6 +191,12 @@
             break;
         case SCN_UPDATEUI:
             [self updateStatusBar];
+            [[FindReplaceController sharedController] editorSelectionDidChange:self.editor];
+            break;
+        case SCN_MODIFIED:
+            if ((notification->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0) {
+                [[FindReplaceController sharedController] editorContentDidChange:self.editor];
+            }
             break;
         default:
             break;
@@ -343,30 +349,23 @@
 }
 
 - (IBAction)showFind:(nullable id)sender {
-    if (!_findReplaceController) {
-        _findReplaceController = [[FindReplaceController alloc] init];
-    }
-    [_findReplaceController showForEditor:self.editor];
+    [[FindReplaceController sharedController] showForEditor:self.editor];
 }
 
 - (IBAction)showReplace:(nullable id)sender {
-    [self showFind:sender];
+    [[FindReplaceController sharedController] showReplaceForEditor:self.editor];
 }
 
 - (IBAction)findNext:(nullable id)sender {
-    if (_findReplaceController) {
-        [_findReplaceController findNext];
-    } else {
-        [self showFind:sender];
-    }
+    FindReplaceController *frc = [FindReplaceController sharedController];
+    frc.editor = self.editor;
+    [frc findNext];
 }
 
 - (IBAction)findPrevious:(nullable id)sender {
-    if (_findReplaceController) {
-        [_findReplaceController findPrevious];
-    } else {
-        [self showFind:sender];
-    }
+    FindReplaceController *frc = [FindReplaceController sharedController];
+    frc.editor = self.editor;
+    [frc findPrevious];
 }
 
 - (IBAction)goToLine:(nullable id)sender {
