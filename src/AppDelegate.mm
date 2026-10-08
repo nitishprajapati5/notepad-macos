@@ -250,7 +250,7 @@
     NSMenu *zoomMenu = [[NSMenu alloc] initWithTitle:@"Zoom"];
     [zoomMenu addItemWithTitle:@"Zoom In"
                         action:@selector(zoomIn:)
-                 keyEquivalent:@"+"];
+                 keyEquivalent:@"="];
     [zoomMenu addItemWithTitle:@"Zoom Out"
                         action:@selector(zoomOut:)
                  keyEquivalent:@"-"];

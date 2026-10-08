@@ -1,12 +1,13 @@
 #import <Cocoa/Cocoa.h>
 #import "ScintillaView.h"
 
+#import "StatusBarView.h"
+
 NS_ASSUME_NONNULL_BEGIN
 
-@class StatusBarView;
 @class FindReplaceController;
 
-@interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation>
+@interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation, StatusBarViewDelegate>
 
 @property (nonatomic, strong) ScintillaView *editor;
 @property (nonatomic, strong) StatusBarView *statusBar;

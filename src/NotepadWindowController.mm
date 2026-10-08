@@ -75,6 +75,7 @@
     _statusBar = [[StatusBarView alloc] initWithFrame:NSMakeRect(0, 0, contentView.bounds.size.width, sbHeight)];
     _statusBar.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     _statusBar.hidden = !showStatusBar;
+    _statusBar.delegate = self;
     [contentView addSubview:_statusBar];
 
     // Scintilla Editor (takes entire area above status bar)
@@ -107,6 +108,11 @@
 
 - (void)handlePreferencesChanged:(NSNotification *)notification {
     dispatch_async(dispatch_get_main_queue(), ^{
+        PreferencesManager *prefs = [PreferencesManager sharedManager];
+        if (self.statusBar && self.statusBar.isHidden == prefs.showStatusBar) {
+            self.statusBar.hidden = !prefs.showStatusBar;
+            [self layoutSubviews];
+        }
         [self.editor np_applyDefaultTheme];
         [self updateStatusBar];
     });
@@ -128,11 +134,22 @@
 - (void)updateStatusBar {
     if (!self.editor || !self.statusBar) return;
 
-    // 1. Line & Column (1-based)
+    // 1. Line & Column (1-based) & Selection Metrics
     long pos = [self.editor getGeneralProperty:SCI_GETCURRENTPOS];
     long line = [self.editor getGeneralProperty:SCI_LINEFROMPOSITION parameter:pos] + 1;
     long col = [self.editor getGeneralProperty:SCI_GETCOLUMN parameter:pos] + 1;
-    [self.statusBar updateLine:line column:col];
+
+    long selStart = [self.editor getGeneralProperty:SCI_GETSELECTIONSTART];
+    long selEnd = [self.editor getGeneralProperty:SCI_GETSELECTIONEND];
+    if (selEnd > selStart) {
+        long startLine = [self.editor getGeneralProperty:SCI_LINEFROMPOSITION parameter:selStart];
+        long endLine = [self.editor getGeneralProperty:SCI_LINEFROMPOSITION parameter:selEnd];
+        long linesSelected = (endLine - startLine) + 1;
+        long charsSelected = selEnd - selStart;
+        [self.statusBar updateLine:line column:col selectedChars:charsSelected selectedLines:linesSelected];
+    } else {
+        [self.statusBar updateLine:line column:col];
+    }
 
     // 2. Zoom Percentage
     long zoom = [self.editor getGeneralProperty:SCI_GETZOOM];
@@ -151,14 +168,47 @@
 
     // 4. Encoding
     NSString *encName = @"UTF-8";
-    if (self.encoding == NSISOLatin1StringEncoding) {
+    if (self.encoding == NSISOLatin1StringEncoding || self.encoding == NSWindowsCP1252StringEncoding) {
         encName = @"ANSI";
-    } else if (self.encoding == NSUTF16StringEncoding) {
+    } else if (self.encoding == NSUTF16StringEncoding || self.encoding == NSUTF16LittleEndianStringEncoding) {
         encName = @"UTF-16 LE";
     } else if (self.encoding == NSUTF16BigEndianStringEncoding) {
         encName = @"UTF-16 BE";
     }
     [self.statusBar setEncodingName:encName];
+}
+
+#pragma mark - StatusBarViewDelegate
+
+- (void)statusBarDidClickPosition:(StatusBarView *)statusBar {
+    [self goToLine:nil];
+}
+
+- (void)statusBarDidRequestZoomIn:(StatusBarView *)statusBar {
+    [self zoomIn:nil];
+}
+
+- (void)statusBarDidRequestZoomOut:(StatusBarView *)statusBar {
+    [self zoomOut:nil];
+}
+
+- (void)statusBarDidRequestZoomReset:(StatusBarView *)statusBar {
+    [self restoreDefaultZoom:nil];
+}
+
+- (void)statusBar:(StatusBarView *)statusBar didSelectEolMode:(NSInteger)eolMode {
+    if (!self.editor) return;
+    [self.editor message:SCI_SETEOLMODE wParam:eolMode lParam:0];
+    [self.editor message:SCI_CONVERTEOLS wParam:eolMode lParam:0];
+    [self updateStatusBar];
+    [self updateWindowTitle];
+}
+
+- (void)statusBar:(StatusBarView *)statusBar didSelectEncoding:(NSStringEncoding)encoding {
+    if (self.encoding == encoding) return;
+    self.encoding = encoding;
+    [self updateStatusBar];
+    [self updateWindowTitle];
 }
 
 - (void)loadFile:(NSString *)path {
