@@ -32,33 +32,40 @@
         }
     }
 
+    BOOL isDark = [prefs isDarkModeActive];
+
+    // Scintilla BGR/RGB integer format:
+    // Light Mode: Pure White background (0xFFFFFF), Black text (0x000000)
+    // Dark Mode: Dark gray background (0x202020), Soft white text (0xDCDCDC)
+    sptr_t backColor   = isDark ? 0x202020 : 0xFFFFFF;
+    sptr_t foreColor   = isDark ? 0xDCDCDC : 0x000000;
+    sptr_t caretColor  = isDark ? 0xFFFFFF : 0x000000;
+    sptr_t lineNumFore = isDark ? 0x858585 : 0x707070;
+    sptr_t lineNumBack = isDark ? 0x252526 : 0xF5F5F5;
+
     // Set font & size on STYLE_DEFAULT
     [self setStringProperty:SCI_STYLESETFONT parameter:STYLE_DEFAULT value:fontName];
     [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_DEFAULT value:fontSize];
-
-    // Colors: Pure White background (0xFFFFFF) and Pitch-Black text (0x000000)
-    // Note: Scintilla BGR/RGB integer format: Black = 0x000000, White = 0xFFFFFF
-    [self message:SCI_STYLESETFORE wParam:STYLE_DEFAULT lParam:0x000000];
-    [self message:SCI_STYLESETBACK wParam:STYLE_DEFAULT lParam:0xFFFFFF];
+    [self message:SCI_STYLESETFORE wParam:STYLE_DEFAULT lParam:foreColor];
+    [self message:SCI_STYLESETBACK wParam:STYLE_DEFAULT lParam:backColor];
 
     // Clear all styles to copy STYLE_DEFAULT across all style slots
     [self message:SCI_STYLECLEARALL];
 
-    // Explicitly enforce black text and white background across all styles 0..127
-    // Style 0 is the primary style applied to all typed plain text without a lexer.
+    // Explicitly enforce colors across all style slots 0..127
     for (int i = 0; i < 128; i++) {
-        [self message:SCI_STYLESETFORE wParam:i lParam:0x000000];
-        [self message:SCI_STYLESETBACK wParam:i lParam:0xFFFFFF];
+        [self message:SCI_STYLESETFORE wParam:i lParam:foreColor];
+        [self message:SCI_STYLESETBACK wParam:i lParam:backColor];
         [self setStringProperty:SCI_STYLESETFONT parameter:i value:fontName];
         [self setGeneralProperty:SCI_STYLESETSIZE parameter:i value:fontSize];
     }
 
     // Line number margin styling (when enabled)
-    [self message:SCI_STYLESETFORE wParam:STYLE_LINENUMBER lParam:0x707070];
-    [self message:SCI_STYLESETBACK wParam:STYLE_LINENUMBER lParam:0xF5F5F5];
+    [self message:SCI_STYLESETFORE wParam:STYLE_LINENUMBER lParam:lineNumFore];
+    [self message:SCI_STYLESETBACK wParam:STYLE_LINENUMBER lParam:lineNumBack];
 
-    // Caret styling: Black 1px cursor matching Windows Notepad, no caret line background
-    [self message:SCI_SETCARETFORE wParam:0x000000 lParam:0];
+    // Caret styling: 1px cursor matching Windows Notepad
+    [self message:SCI_SETCARETFORE wParam:caretColor lParam:0];
     [self message:SCI_SETCARETWIDTH wParam:1 lParam:0];
     [self message:SCI_SETCARETLINEVISIBLE wParam:0 lParam:0];
 

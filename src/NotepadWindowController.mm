@@ -26,10 +26,8 @@
                                                     defer:NO];
     [win center];
     win.minSize = NSMakeSize(400, 200);
-    win.backgroundColor = [NSColor whiteColor];
-    if (@available(macOS 10.14, *)) {
-        win.appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
-    }
+    win.backgroundColor = [[PreferencesManager sharedManager] isDarkModeActive] ?
+        [NSColor colorWithCalibratedRed:0.12 green:0.12 blue:0.12 alpha:1.0] : [NSColor whiteColor];
     [win setFrameAutosaveName:@"NotepadMainWindow"];
 
     self = [super initWithWindow:win];
@@ -47,6 +45,7 @@
                                                             selector:@selector(handleAppearanceChanged:)
                                                                 name:@"AppleInterfaceThemeChangedNotification"
                                                               object:nil];
+
 
         [[NSNotificationCenter defaultCenter] addObserver:self
                                                  selector:@selector(handlePreferencesChanged:)
@@ -87,29 +86,46 @@
     _editor.delegate = self;
     [contentView addSubview:_editor];
 
-    if (@available(macOS 10.14, *)) {
-        NSAppearance *aqua = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
-        window.appearance = aqua;
-        _editor.appearance = aqua;
-        _statusBar.appearance = aqua;
-    }
-
-    // Apply default theme and initial editor settings
-    [_editor np_applyDefaultTheme];
-    [_editor message:SCI_SETSAVEPOINT];
-
     // Empty Document Overlay (centered watermark tips)
     _emptyOverlayView = [[EmptyDocumentOverlayView alloc] initWithFrame:editorFrame];
     _emptyOverlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [contentView addSubview:_emptyOverlayView positioned:NSWindowAbove relativeTo:_editor];
     [self updateEmptyStateVisibility];
+
+    // Apply initial theme, appearance & settings
+    [self applyThemeAndAppearance];
+    [_editor message:SCI_SETSAVEPOINT];
+}
+
+- (void)applyThemeAndAppearance {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    BOOL isDark = [prefs isDarkModeActive];
+
+    if (@available(macOS 10.14, *)) {
+        if (prefs.themeMode == NPThemeModeLight) {
+            self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+        } else if (prefs.themeMode == NPThemeModeDark) {
+            self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        } else {
+            self.window.appearance = nil; // System Default: inherits from system
+        }
+        self.editor.appearance = self.window.effectiveAppearance;
+        self.statusBar.appearance = self.window.effectiveAppearance;
+        self.emptyOverlayView.appearance = self.window.effectiveAppearance;
+    }
+
+    self.window.backgroundColor = isDark ?
+        [NSColor colorWithCalibratedRed:0.12 green:0.12 blue:0.12 alpha:1.0] : [NSColor whiteColor];
+
+    [self.editor np_applyDefaultTheme];
+    [self.statusBar setNeedsDisplay:YES];
+    [self.emptyOverlayView updateTheme];
+    [self updateStatusBar];
 }
 
 - (void)handleAppearanceChanged:(NSNotification *)notification {
     dispatch_async(dispatch_get_main_queue(), ^{
-        [self.editor np_applyDefaultTheme];
-        [self.statusBar setNeedsDisplay:YES];
-        [self.emptyOverlayView updateTheme];
+        [self applyThemeAndAppearance];
     });
 }
 
@@ -120,10 +136,7 @@
             self.statusBar.hidden = !prefs.showStatusBar;
             [self layoutSubviews];
         }
-        [self.editor np_applyDefaultTheme];
-        [self.statusBar setNeedsDisplay:YES];
-        [self.emptyOverlayView updateTheme];
-        [self updateStatusBar];
+        [self applyThemeAndAppearance];
     });
 }
 
@@ -565,6 +578,24 @@
     [prefs savePreferences];
 }
 
+- (IBAction)setThemeLight:(nullable id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.themeMode = NPThemeModeLight;
+    [prefs savePreferences];
+}
+
+- (IBAction)setThemeDark:(nullable id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.themeMode = NPThemeModeDark;
+    [prefs savePreferences];
+}
+
+- (IBAction)setThemeSystem:(nullable id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.themeMode = NPThemeModeSystem;
+    [prefs savePreferences];
+}
+
 #pragma mark - Menu Item Validation
 
 - (BOOL)validateMenuItem:(NSMenuItem *)menuItem {
@@ -606,6 +637,18 @@
     }
     if (action == @selector(toggleLineNumbers:)) {
         menuItem.state = [self.editor np_lineNumbersVisible] ? NSControlStateValueOn : NSControlStateValueOff;
+        return YES;
+    }
+    if (action == @selector(setThemeLight:)) {
+        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeLight) ? NSControlStateValueOn : NSControlStateValueOff;
+        return YES;
+    }
+    if (action == @selector(setThemeDark:)) {
+        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeDark) ? NSControlStateValueOn : NSControlStateValueOff;
+        return YES;
+    }
+    if (action == @selector(setThemeSystem:)) {
+        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeSystem) ? NSControlStateValueOn : NSControlStateValueOff;
         return YES;
     }
     if (action == @selector(restoreDefaultZoom:)) {

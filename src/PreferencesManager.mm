@@ -8,6 +8,7 @@ static NSString *const kNPTabWidthKey        = @"NP.tabWidth";
 static NSString *const kNPWordWrapKey        = @"NP.wordWrap";
 static NSString *const kNPShowLineNumbersKey = @"NP.showLineNumbers";
 static NSString *const kNPShowStatusBarKey   = @"NP.showStatusBar";
+static NSString *const kNPThemeModeKey       = @"NP.themeMode";
 
 @implementation PreferencesManager
 
@@ -37,7 +38,8 @@ static NSString *const kNPShowStatusBarKey   = @"NP.showStatusBar";
         kNPTabWidthKey: @(4),
         kNPWordWrapKey: @(NO),
         kNPShowLineNumbersKey: @(NO),
-        kNPShowStatusBarKey: @(YES)
+        kNPShowStatusBarKey: @(YES),
+        kNPThemeModeKey: @(NPThemeModeSystem)
     };
     [defs registerDefaults:defaults];
 
@@ -47,6 +49,7 @@ static NSString *const kNPShowStatusBarKey   = @"NP.showStatusBar";
     _wordWrap = [defs boolForKey:kNPWordWrapKey];
     _showLineNumbers = [defs boolForKey:kNPShowLineNumbersKey];
     _showStatusBar = [defs boolForKey:kNPShowStatusBarKey];
+    _themeMode = (NPThemeMode)[defs integerForKey:kNPThemeModeKey];
 }
 
 - (void)savePreferences {
@@ -57,10 +60,31 @@ static NSString *const kNPShowStatusBarKey   = @"NP.showStatusBar";
     [defs setBool:_wordWrap forKey:kNPWordWrapKey];
     [defs setBool:_showLineNumbers forKey:kNPShowLineNumbersKey];
     [defs setBool:_showStatusBar forKey:kNPShowStatusBarKey];
+    [defs setInteger:_themeMode forKey:kNPThemeModeKey];
     [defs synchronize];
 
     [[NSNotificationCenter defaultCenter] postNotificationName:NPPreferencesDidChangeNotification
                                                         object:self];
+}
+
+- (BOOL)isDarkModeActive {
+    if (self.themeMode == NPThemeModeDark) {
+        return YES;
+    } else if (self.themeMode == NPThemeModeLight) {
+        return NO;
+    } else {
+        // System Default
+        if (@available(macOS 10.14, *)) {
+            NSAppearance *appAppearance = [NSApp effectiveAppearance];
+            NSAppearanceName name = [appAppearance bestMatchFromAppearancesWithNames:@[NSAppearanceNameAqua, NSAppearanceNameDarkAqua]];
+            if ([name isEqualToString:NSAppearanceNameDarkAqua]) {
+                return YES;
+            }
+            NSString *style = [[NSUserDefaults standardUserDefaults] stringForKey:@"AppleInterfaceStyle"];
+            return [style isEqualToString:@"Dark"];
+        }
+        return NO;
+    }
 }
 
 @end

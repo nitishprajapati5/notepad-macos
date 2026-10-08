@@ -62,6 +62,11 @@ NS_ASSUME_NONNULL_BEGIN
 - (IBAction)toggleStatusBar:(nullable id)sender;
 - (IBAction)toggleLineNumbers:(nullable id)sender;
 
+- (IBAction)setThemeLight:(nullable id)sender;
+- (IBAction)setThemeDark:(nullable id)sender;
+- (IBAction)setThemeSystem:(nullable id)sender;
+- (void)applyThemeAndAppearance;
+
 @end
 
 NS_ASSUME_NONNULL_END

@@ -3,6 +3,7 @@
 #import "NotepadFileManager.h"
 #import "NotepadDocumentController.h"
 #import "ScintillaView+Notepad.h"
+#import "PreferencesManager.h"
 
 @implementation AppDelegate
 
@@ -260,6 +261,21 @@
     [zoomSubmenuItem setSubmenu:zoomMenu];
     [viewMenu addItem:zoomSubmenuItem];
 
+    // Theme Submenu (Light / Dark / System Default)
+    NSMenuItem *themeSubmenuItem = [[NSMenuItem alloc] initWithTitle:@"Theme" action:nil keyEquivalent:@""];
+    NSMenu *themeMenu = [[NSMenu alloc] initWithTitle:@"Theme"];
+    [themeMenu addItemWithTitle:@"Light"
+                         action:@selector(setThemeLight:)
+                  keyEquivalent:@""];
+    [themeMenu addItemWithTitle:@"Dark"
+                         action:@selector(setThemeDark:)
+                  keyEquivalent:@""];
+    [themeMenu addItemWithTitle:@"System Default"
+                         action:@selector(setThemeSystem:)
+                  keyEquivalent:@""];
+    [themeSubmenuItem setSubmenu:themeMenu];
+    [viewMenu addItem:themeSubmenuItem];
+
     [viewMenu addItem:[NSMenuItem separatorItem]];
     [viewMenu addItemWithTitle:@"Status Bar"
                         action:@selector(toggleStatusBar:)
@@ -297,6 +313,24 @@
     [menubar addItem:helpMenuItem];
 
     [NSApp setMainMenu:menubar];
+}
+
+- (IBAction)setThemeLight:(nullable id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.themeMode = NPThemeModeLight;
+    [prefs savePreferences];
+}
+
+- (IBAction)setThemeDark:(nullable id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.themeMode = NPThemeModeDark;
+    [prefs savePreferences];
+}
+
+- (IBAction)setThemeSystem:(nullable id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.themeMode = NPThemeModeSystem;
+    [prefs savePreferences];
 }
 
 @end
