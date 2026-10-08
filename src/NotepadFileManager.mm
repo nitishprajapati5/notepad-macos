@@ -121,6 +121,7 @@
     targetWC.isDirty = NO;
     [targetWC updateWindowTitle];
     [targetWC updateStatusBar];
+    [targetWC updateEmptyStateVisibility];
 
     // Note in Recent Documents
     [[NSDocumentController sharedDocumentController] noteNewRecentDocumentURL:[NSURL fileURLWithPath:path]];

@@ -6,11 +6,13 @@
 NS_ASSUME_NONNULL_BEGIN
 
 @class FindReplaceController;
+@class EmptyDocumentOverlayView;
 
 @interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation, StatusBarViewDelegate>
 
 @property (nonatomic, strong) ScintillaView *editor;
 @property (nonatomic, strong) StatusBarView *statusBar;
+@property (nonatomic, strong) EmptyDocumentOverlayView *emptyOverlayView;
 @property (nonatomic, strong, nullable) FindReplaceController *findReplaceController;
 @property (nonatomic, copy, nullable) NSString *filePath;
 @property (nonatomic, assign) BOOL isDirty;
@@ -20,6 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)loadFile:(NSString *)path;
 - (void)updateWindowTitle;
 - (void)updateStatusBar;
+- (void)updateEmptyStateVisibility;
 
 - (BOOL)saveFile;
 - (BOOL)saveFileAs;

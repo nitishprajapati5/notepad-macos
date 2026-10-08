@@ -3,6 +3,7 @@
 #import "AppDelegate.h"
 #import "ScintillaView+Notepad.h"
 #import "StatusBarView.h"
+#import "EmptyDocumentOverlayView.h"
 #import "FindReplaceController.h"
 #import "PreferencesManager.h"
 #import "Scintilla.h"
@@ -97,12 +98,18 @@
     [_editor np_applyDefaultTheme];
     [_editor message:SCI_SETSAVEPOINT];
 
+    // Empty Document Overlay (centered watermark tips)
+    _emptyOverlayView = [[EmptyDocumentOverlayView alloc] initWithFrame:editorFrame];
+    _emptyOverlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [contentView addSubview:_emptyOverlayView positioned:NSWindowAbove relativeTo:_editor];
+    [self updateEmptyStateVisibility];
 }
 
 - (void)handleAppearanceChanged:(NSNotification *)notification {
     dispatch_async(dispatch_get_main_queue(), ^{
         [self.editor np_applyDefaultTheme];
         [self.statusBar setNeedsDisplay:YES];
+        [self.emptyOverlayView updateTheme];
     });
 }
 
@@ -114,6 +121,8 @@
             [self layoutSubviews];
         }
         [self.editor np_applyDefaultTheme];
+        [self.statusBar setNeedsDisplay:YES];
+        [self.emptyOverlayView updateTheme];
         [self updateStatusBar];
     });
 }
@@ -213,6 +222,31 @@
 
 - (void)loadFile:(NSString *)path {
     [[NotepadFileManager sharedManager] openFileAtPath:path inController:self];
+    [self updateEmptyStateVisibility];
+}
+
+- (void)updateEmptyStateVisibility {
+    if (!self.editor || !_emptyOverlayView) return;
+    long length = [self.editor message:SCI_GETLENGTH];
+    BOOL isEmpty = (length == 0);
+
+    if (isEmpty && _emptyOverlayView.isHidden) {
+        _emptyOverlayView.alphaValue = 0.0;
+        _emptyOverlayView.hidden = NO;
+        [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+            context.duration = 0.15;
+            self->_emptyOverlayView.animator.alphaValue = 1.0;
+        }];
+    } else if (!isEmpty && !_emptyOverlayView.isHidden) {
+        [NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+            context.duration = 0.12;
+            self->_emptyOverlayView.animator.alphaValue = 0.0;
+        } completionHandler:^{
+            if ([self.editor message:SCI_GETLENGTH] > 0) {
+                self->_emptyOverlayView.hidden = YES;
+            }
+        }];
+    }
 }
 
 #pragma mark - Scintilla Notifications
@@ -246,6 +280,7 @@
         case SCN_MODIFIED:
             if ((notification->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0) {
                 [[FindReplaceController sharedController] editorContentDidChange:self.editor];
+                [self updateEmptyStateVisibility];
             }
             break;
         default:
@@ -517,6 +552,9 @@
     CGFloat sbHeight = showStatusBar ? 24.0 : 0.0;
     self.statusBar.frame = NSMakeRect(0, 0, bounds.size.width, sbHeight);
     self.editor.frame = NSMakeRect(0, sbHeight, bounds.size.width, bounds.size.height - sbHeight);
+    if (self.emptyOverlayView) {
+        self.emptyOverlayView.frame = self.editor.frame;
+    }
 }
 
 - (IBAction)toggleLineNumbers:(nullable id)sender {
