@@ -58,7 +58,7 @@ static NSString *const kNPAutoIndentKey      = @"NP.autoIndent";
 
     NSDictionary *defaults = @{
         kNPFontNameKey: @"Menlo",
-        kNPFontSizeKey: @(12),
+        kNPFontSizeKey: @(16),
         kNPTabWidthKey: @(4),
         kNPUseSpacesKey: @(NO),
         kNPWordWrapKey: @(NO),
@@ -73,6 +73,10 @@ static NSString *const kNPAutoIndentKey      = @"NP.autoIndent";
 
     _fontName = [defs stringForKey:kNPFontNameKey] ?: @"Menlo";
     _fontSize = [defs integerForKey:kNPFontSizeKey];
+    if (_fontSize <= 0 || _fontSize == 12) {
+        _fontSize = 16;
+        [defs setInteger:16 forKey:kNPFontSizeKey];
+    }
     _tabWidth = [defs integerForKey:kNPTabWidthKey];
     _useSpaces = [defs boolForKey:kNPUseSpacesKey];
     _wordWrap = [defs boolForKey:kNPWordWrapKey];

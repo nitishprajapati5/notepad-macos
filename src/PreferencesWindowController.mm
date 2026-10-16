@@ -770,7 +770,7 @@
 
     PreferencesManager *prefs = [PreferencesManager sharedManager];
     NSString *fontName = prefs.fontName ?: @"Menlo";
-    NSInteger fontSize = prefs.fontSize > 0 ? prefs.fontSize : 12;
+    NSInteger fontSize = prefs.fontSize > 0 ? prefs.fontSize : 16;
 
     NSFont *font = [NSFont fontWithName:fontName size:fontSize] ?: [NSFont monospacedSystemFontOfSize:fontSize weight:NSFontWeightRegular];
     self.fontPreviewTextView.font = font;

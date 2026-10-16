@@ -18,7 +18,7 @@
 
     PreferencesManager *prefs = [PreferencesManager sharedManager];
     NSString *fontName = prefs.fontName ?: @"Menlo";
-    NSInteger fontSize = prefs.fontSize > 0 ? prefs.fontSize : 12;
+    NSInteger fontSize = prefs.fontSize > 0 ? prefs.fontSize : 16;
 
     // Check if SF Mono is preferred/available
     if ([fontName isEqualToString:@"SF Mono"]) {
