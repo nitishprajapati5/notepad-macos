@@ -183,8 +183,8 @@
         [_sep3.bottomAnchor constraintEqualToAnchor:self.bottomAnchor constant:-4.0],
         [_sep3.widthAnchor constraintEqualToConstant:1.0],
 
-        // 4. Encoding Button (fixed width 100pt)
-        [_encButton.widthAnchor constraintEqualToConstant:100.0],
+        // 4. Encoding Button (width 120pt for complete encoding labels)
+        [_encButton.widthAnchor constraintEqualToConstant:120.0],
         [_encButton.centerYAnchor constraintEqualToAnchor:self.centerYAnchor],
         [_encButton.heightAnchor constraintEqualToAnchor:self.heightAnchor constant:-2.0],
         [_encButton.trailingAnchor constraintEqualToAnchor:self.trailingAnchor constant:-10.0]

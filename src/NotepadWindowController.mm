@@ -140,7 +140,12 @@
         [self.editor np_setLineNumbersVisible:prefs.showLineNumbers];
         [self.editor np_setTabWidth:prefs.tabWidth];
         [self.editor np_setUseSpaces:prefs.useSpaces];
+
+        // Synchronize encoding with Settings Panel defaultEncoding
+        self.encoding = prefs.defaultEncoding;
+
         [self applyThemeAndAppearance];
+        [self updateStatusBar];
     });
 }
 
@@ -194,12 +199,20 @@
 
     // 4. Encoding
     NSString *encName = @"UTF-8";
-    if (self.encoding == NSISOLatin1StringEncoding || self.encoding == NSWindowsCP1252StringEncoding) {
-        encName = @"ANSI";
+    if (self.encoding == NSWindowsCP1252StringEncoding) {
+        encName = @"Windows-1252";
+    } else if (self.encoding == NSISOLatin1StringEncoding) {
+        encName = @"ISO-8859-1";
+    } else if (self.encoding == NSASCIIStringEncoding) {
+        encName = @"US-ASCII";
     } else if (self.encoding == NSUTF16StringEncoding || self.encoding == NSUTF16LittleEndianStringEncoding) {
         encName = @"UTF-16 LE";
     } else if (self.encoding == NSUTF16BigEndianStringEncoding) {
         encName = @"UTF-16 BE";
+    } else if (self.encoding == NSUTF8StringEncoding) {
+        encName = @"UTF-8";
+    } else {
+        encName = [PreferencesManager nameForEncoding:self.encoding];
     }
     [self.statusBar setEncodingName:encName];
 }
@@ -233,6 +246,8 @@
 - (void)statusBar:(StatusBarView *)statusBar didSelectEncoding:(NSStringEncoding)encoding {
     if (self.encoding == encoding) return;
     self.encoding = encoding;
+    [PreferencesManager sharedManager].defaultEncoding = encoding;
+    [[PreferencesManager sharedManager] savePreferences];
     [self updateStatusBar];
     [self updateWindowTitle];
 }

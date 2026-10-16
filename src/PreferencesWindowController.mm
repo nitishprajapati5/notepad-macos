@@ -1,39 +1,66 @@
 #import "PreferencesWindowController.h"
 #import "PreferencesManager.h"
 
-static NSString *const kToolbarEditor     = @"ToolbarEditor";
-static NSString *const kToolbarAppearance = @"ToolbarAppearance";
-static NSString *const kToolbarEncoding   = @"ToolbarEncoding";
-static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
+@interface NPCategoryItem : NSObject
+@property (nonatomic, copy) NSString *title;
+@property (nonatomic, copy) NSString *iconName;
+@property (nonatomic, copy) NSString *systemSymbol;
+@end
+
+@implementation NPCategoryItem
++ (instancetype)itemWithTitle:(NSString *)title icon:(NSString *)icon symbol:(NSString *)symbol {
+    NPCategoryItem *item = [[NPCategoryItem alloc] init];
+    item.title = title;
+    item.iconName = icon;
+    item.systemSymbol = symbol;
+    return item;
+}
+@end
 
 @interface PreferencesWindowController ()
 
-@property (nonatomic, strong) NSToolbar *toolbar;
-@property (nonatomic, strong) NSView *containerView;
+@property (nonatomic, strong) NSArray<NPCategoryItem *> *categories;
+@property (nonatomic, strong) NSScrollView *tableScrollView;
+@property (nonatomic, strong) NSTableView *tableView;
+@property (nonatomic, strong) NSView *detailContainer;
+@property (nonatomic, strong) NSBox *verticalDivider;
+@property (nonatomic, strong) NSBox *bottomDivider;
+@property (nonatomic, strong) NSButton *closeButton;
 
-// Editor Controls
+// Section Views
+@property (nonatomic, strong) NSView *generalView;
 @property (nonatomic, strong) NSView *editorView;
-@property (nonatomic, strong) NSTextField *fontDisplayLabel;
-@property (nonatomic, strong) NSPopUpButton *tabWidthPopup;
-@property (nonatomic, strong) NSButton *useSpacesCheckbox;
+@property (nonatomic, strong) NSView *themeView;
+@property (nonatomic, strong) NSView *encodingView;
+@property (nonatomic, strong) NSView *backupView;
+
+// General Controls
+@property (nonatomic, strong) NSButton *showStatusBarCheckbox;
+@property (nonatomic, strong) NSButton *showLineNumbersCheckbox;
 @property (nonatomic, strong) NSButton *wordWrapCheckbox;
 
-// Appearance Controls
-@property (nonatomic, strong) NSView *appearanceView;
+// Editor Controls
+@property (nonatomic, strong) NSPopUpButton *fontFamilyPopup;
+@property (nonatomic, strong) NSPopUpButton *fontSizePopup;
+@property (nonatomic, strong) NSTextView *fontPreviewTextView;
+@property (nonatomic, strong) NSScrollView *previewScrollView;
+@property (nonatomic, strong) NSPopUpButton *tabWidthPopup;
+@property (nonatomic, strong) NSButton *useSpacesCheckbox;
+
+// Theme Controls
 @property (nonatomic, strong) NSSegmentedControl *themeSegmentedControl;
-@property (nonatomic, strong) NSButton *showLineNumbersCheckbox;
-@property (nonatomic, strong) NSButton *showStatusBarCheckbox;
 
 // Encoding Controls
-@property (nonatomic, strong) NSView *encodingView;
 @property (nonatomic, strong) NSPopUpButton *encodingPopup;
 
-// Advanced Controls
-@property (nonatomic, strong) NSView *advancedView;
+// Backup & Advanced Controls
 @property (nonatomic, strong) NSButton *backupOnSaveCheckbox;
 @property (nonatomic, strong) NSButton *autoIndentCheckbox;
 
-@property (nonatomic, copy) NSString *currentTabIdentifier;
+// Cards list for dynamic color updates
+@property (nonatomic, strong) NSMutableArray<NSBox *> *cardBoxes;
+@property (nonatomic, strong) NSMutableArray<NSTextField *> *cardHeaderLabels;
+@property (nonatomic, strong) NSMutableArray<NSTextField *> *secondaryLabels;
 
 @end
 
@@ -49,9 +76,10 @@ static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
 }
 
 - (instancetype)init {
-    NSRect frame = NSMakeRect(0, 0, 480, 260);
+    NSRect frame = NSMakeRect(0, 0, 740, 540);
     NSWindowStyleMask style = NSWindowStyleMaskTitled |
-                              NSWindowStyleMaskClosable;
+                              NSWindowStyleMaskClosable |
+                              NSWindowStyleMaskMiniaturizable;
 
     NSWindow *window = [[NSWindow alloc] initWithContentRect:frame
                                                    styleMask:style
@@ -63,7 +91,21 @@ static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
     self = [super initWithWindow:window];
     if (self) {
         window.delegate = self;
+
+        _cardBoxes = [NSMutableArray array];
+        _cardHeaderLabels = [NSMutableArray array];
+        _secondaryLabels = [NSMutableArray array];
+
+        self.categories = @[
+            [NPCategoryItem itemWithTitle:@"General" icon:NSImageNamePreferencesGeneral symbol:@"gearshape"],
+            [NPCategoryItem itemWithTitle:@"Editor" icon:NSImageNameMultipleDocuments symbol:@"doc.text"],
+            [NPCategoryItem itemWithTitle:@"Dark Mode" icon:NSImageNameColorPanel symbol:@"moon.fill"],
+            [NPCategoryItem itemWithTitle:@"New Document" icon:NSImageNameFolder symbol:@"character.book.closed"],
+            [NPCategoryItem itemWithTitle:@"Backup" icon:NSImageNameAdvanced symbol:@"archivebox"]
+        ];
+
         [self setupUI];
+        [self applyThemeColors];
         [self reloadPreferencesValues];
 
         [[NSNotificationCenter defaultCenter] addObserver:self
@@ -78,61 +120,326 @@ static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
+#pragma mark - Color Palette (Sleek Deep Black Aesthetics)
+
+- (BOOL)isDark {
+    return [[PreferencesManager sharedManager] isDarkModeActive];
+}
+
+- (NSColor *)windowBgColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedRed:0.07 green:0.07 blue:0.08 alpha:1.0] : // Sleek rich black #121214
+        [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
+}
+
+- (NSColor *)sidebarBgColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedRed:0.09 green:0.09 blue:0.105 alpha:1.0] : // Deep obsidian #17171B
+        [NSColor colorWithCalibratedWhite:0.91 alpha:1.0];
+}
+
+- (NSColor *)cardBgColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedRed:0.115 green:0.115 blue:0.135 alpha:1.0] : // Graphite Card #1D1D22
+        [NSColor whiteColor];
+}
+
+- (NSColor *)cardBorderColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedRed:0.20 green:0.20 blue:0.23 alpha:1.0] : // Crisp subtle border #33333B
+        [NSColor colorWithCalibratedWhite:0.84 alpha:1.0];
+}
+
+- (NSColor *)previewBgColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedRed:0.055 green:0.055 blue:0.065 alpha:1.0] : // Darker code canvas #0E0E10
+        [NSColor colorWithCalibratedWhite:0.98 alpha:1.0];
+}
+
+- (NSColor *)previewTextColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedWhite:0.93 alpha:1.0] :
+        [NSColor colorWithCalibratedWhite:0.05 alpha:1.0];
+}
+
+- (NSColor *)primaryTextColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedWhite:0.95 alpha:1.0] :
+        [NSColor colorWithCalibratedWhite:0.10 alpha:1.0];
+}
+
+- (NSColor *)secondaryTextColor {
+    return [self isDark] ?
+        [NSColor colorWithCalibratedWhite:0.62 alpha:1.0] :
+        [NSColor colorWithCalibratedWhite:0.42 alpha:1.0];
+}
+
+- (void)applyThemeColors {
+    NSColor *winColor = [self windowBgColor];
+    self.window.backgroundColor = winColor;
+
+    NSView *contentView = self.window.contentView;
+    contentView.wantsLayer = YES;
+    contentView.layer.backgroundColor = winColor.CGColor;
+
+    NSColor *sideColor = [self sidebarBgColor];
+    self.tableScrollView.wantsLayer = YES;
+    self.tableScrollView.layer.backgroundColor = sideColor.CGColor;
+    self.tableView.backgroundColor = sideColor;
+
+    self.detailContainer.wantsLayer = YES;
+    self.detailContainer.layer.backgroundColor = winColor.CGColor;
+
+    NSColor *cardFill = [self cardBgColor];
+    NSColor *cardBorder = [self cardBorderColor];
+    for (NSBox *box in self.cardBoxes) {
+        box.fillColor = cardFill;
+        box.borderColor = cardBorder;
+    }
+
+    NSColor *priColor = [self primaryTextColor];
+    for (NSTextField *label in self.cardHeaderLabels) {
+        label.textColor = priColor;
+    }
+
+    NSColor *secColor = [self secondaryTextColor];
+    for (NSTextField *label in self.secondaryLabels) {
+        label.textColor = secColor;
+    }
+
+    [self updateFontPreview];
+    [self.tableView reloadData];
+}
+
 #pragma mark - UI Setup
 
 - (void)setupUI {
-    NSWindow *win = self.window;
+    NSView *contentView = self.window.contentView;
+    contentView.wantsLayer = YES;
 
-    // Toolbar setup
-    self.toolbar = [[NSToolbar alloc] initWithIdentifier:@"PreferencesToolbar"];
-    self.toolbar.delegate = self;
-    self.toolbar.allowsUserCustomization = NO;
-    self.toolbar.autosavesConfiguration = NO;
-    self.toolbar.displayMode = NSToolbarDisplayModeIconAndLabel;
-    win.toolbar = self.toolbar;
+    CGFloat windowWidth = 740;
+    CGFloat windowHeight = 540;
+    CGFloat bottomBarHeight = 52;
+    CGFloat sidebarWidth = 180;
+    CGFloat mainHeight = windowHeight - bottomBarHeight;
 
-    // Main container view
-    self.containerView = [[NSView alloc] initWithFrame:win.contentView.bounds];
-    self.containerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [win.contentView addSubview:self.containerView];
+    // 1. Sidebar ScrollView & TableView
+    self.tableScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(0, bottomBarHeight, sidebarWidth, mainHeight)];
+    self.tableScrollView.hasVerticalScroller = NO;
+    self.tableScrollView.hasHorizontalScroller = NO;
+    self.tableScrollView.borderType = NSNoBorder;
+    self.tableScrollView.drawsBackground = YES;
 
-    // Build the 4 views
-    [self buildEditorView];
-    [self buildAppearanceView];
-    [self buildEncodingView];
-    [self buildAdvancedView];
+    NSTableColumn *column = [[NSTableColumn alloc] initWithIdentifier:@"CategoryColumn"];
+    column.width = sidebarWidth - 4;
 
-    // Select initial tab
-    [self switchToTab:kToolbarEditor animate:NO];
-    self.toolbar.selectedItemIdentifier = kToolbarEditor;
+    self.tableView = [[NSTableView alloc] initWithFrame:self.tableScrollView.bounds];
+    [self.tableView addTableColumn:column];
+    self.tableView.headerView = nil;
+    self.tableView.dataSource = self;
+    self.tableView.delegate = self;
+    self.tableView.rowHeight = 36;
+    self.tableView.selectionHighlightStyle = NSTableViewSelectionHighlightStyleRegular;
+
+    self.tableScrollView.documentView = self.tableView;
+    [contentView addSubview:self.tableScrollView];
+
+    // 2. Vertical Divider
+    self.verticalDivider = [[NSBox alloc] initWithFrame:NSMakeRect(sidebarWidth, bottomBarHeight, 1, mainHeight)];
+    self.verticalDivider.boxType = NSBoxSeparator;
+    [contentView addSubview:self.verticalDivider];
+
+    // 3. Detail Content Container
+    CGFloat detailX = sidebarWidth + 1;
+    CGFloat detailWidth = windowWidth - detailX;
+    self.detailContainer = [[NSView alloc] initWithFrame:NSMakeRect(detailX, bottomBarHeight, detailWidth, mainHeight)];
+    self.detailContainer.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [contentView addSubview:self.detailContainer];
+
+    // 4. Bottom Bar
+    self.bottomDivider = [[NSBox alloc] initWithFrame:NSMakeRect(0, bottomBarHeight, windowWidth, 1)];
+    self.bottomDivider.boxType = NSBoxSeparator;
+    [contentView addSubview:self.bottomDivider];
+
+    self.closeButton = [NSButton buttonWithTitle:@"Close" target:self action:@selector(closeButtonClicked:)];
+    self.closeButton.bezelStyle = NSBezelStyleRounded;
+    self.closeButton.frame = NSMakeRect(windowWidth - 110, 12, 95, 30);
+    self.closeButton.keyEquivalent = @"\r";
+    [contentView addSubview:self.closeButton];
+
+    // Build the 5 Category Views with ample widths & vertical breathing space
+    [self buildGeneralView:NSMakeRect(0, 0, detailWidth, mainHeight)];
+    [self buildEditorView:NSMakeRect(0, 0, detailWidth, mainHeight)];
+    [self buildThemeView:NSMakeRect(0, 0, detailWidth, mainHeight)];
+    [self buildEncodingView:NSMakeRect(0, 0, detailWidth, mainHeight)];
+    [self buildBackupView:NSMakeRect(0, 0, detailWidth, mainHeight)];
+
+    // Select initial row (General)
+    [self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:0] byExtendingSelection:NO];
+    [self showCategoryIndex:0];
 }
 
-#pragma mark - Tab Views Construction
+#pragma mark - Card & Component Construction Helpers
 
-- (void)buildEditorView {
-    NSRect bounds = NSMakeRect(0, 0, 480, 220);
+- (NSBox *)createCardWithTitle:(NSString *)title frame:(NSRect)frame {
+    NSBox *box = [[NSBox alloc] initWithFrame:frame];
+    box.boxType = NSBoxCustom;
+    box.borderType = NSLineBorder;
+    box.borderWidth = 1.0;
+    box.borderColor = [self cardBorderColor];
+    box.fillColor = [self cardBgColor];
+    box.cornerRadius = 10.0;
+    box.titlePosition = NSNoTitle;
+
+    NSTextField *titleLabel = [NSTextField labelWithString:title];
+    titleLabel.font = [NSFont systemFontOfSize:13.5 weight:NSFontWeightSemibold];
+    titleLabel.textColor = [self primaryTextColor];
+    titleLabel.frame = NSMakeRect(22, frame.size.height - 34, frame.size.width - 44, 20);
+    [box addSubview:titleLabel];
+
+    [self.cardBoxes addObject:box];
+    [self.cardHeaderLabels addObject:titleLabel];
+    return box;
+}
+
+- (NSTextField *)makeDescriptionLabel:(NSString *)text frame:(NSRect)frame {
+    NSTextField *label = [NSTextField labelWithString:text];
+    label.frame = frame;
+    label.editable = NO;
+    label.selectable = NO;
+    label.bezeled = NO;
+    label.drawsBackground = NO;
+    label.lineBreakMode = NSLineBreakByWordWrapping;
+    label.maximumNumberOfLines = 0;
+    label.font = [NSFont systemFontOfSize:11.5 weight:NSFontWeightRegular];
+    label.textColor = [self secondaryTextColor];
+    [self.secondaryLabels addObject:label];
+    return label;
+}
+
+#pragma mark - Category Views
+
+// 1. General View
+- (void)buildGeneralView:(NSRect)bounds {
+    self.generalView = [[NSView alloc] initWithFrame:bounds];
+
+    CGFloat cardWidth = bounds.size.width - 48;
+    CGFloat cardHeight = 175;
+    CGFloat cardY = bounds.size.height - cardHeight - 24;
+
+    NSBox *interfaceCard = [self createCardWithTitle:@"Interface & View"
+                                               frame:NSMakeRect(24, cardY, cardWidth, cardHeight)];
+
+    self.showStatusBarCheckbox = [NSButton checkboxWithTitle:@"Show status bar"
+                                                      target:self
+                                                      action:@selector(statusBarToggled:)];
+    self.showStatusBarCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.showStatusBarCheckbox.frame = NSMakeRect(24, 100, cardWidth - 48, 24);
+    [interfaceCard addSubview:self.showStatusBarCheckbox];
+
+    self.showLineNumbersCheckbox = [NSButton checkboxWithTitle:@"Show line numbers gutter"
+                                                        target:self
+                                                        action:@selector(lineNumbersToggled:)];
+    self.showLineNumbersCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.showLineNumbersCheckbox.frame = NSMakeRect(24, 62, cardWidth - 48, 24);
+    [interfaceCard addSubview:self.showLineNumbersCheckbox];
+
+    self.wordWrapCheckbox = [NSButton checkboxWithTitle:@"Word wrap by default"
+                                                 target:self
+                                                 action:@selector(wordWrapToggled:)];
+    self.wordWrapCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.wordWrapCheckbox.frame = NSMakeRect(24, 24, cardWidth - 48, 24);
+    [interfaceCard addSubview:self.wordWrapCheckbox];
+
+    [self.generalView addSubview:interfaceCard];
+}
+
+// 2. Editor View (Font, Size, Preview, Tabs)
+- (void)buildEditorView:(NSRect)bounds {
     self.editorView = [[NSView alloc] initWithFrame:bounds];
 
-    // Font Label & Preview
-    NSTextField *fontTitle = [self makeLabel:@"Font:" bold:YES];
-    fontTitle.frame = NSMakeRect(30, 160, 100, 22);
-    [self.editorView addSubview:fontTitle];
+    CGFloat cardWidth = bounds.size.width - 48;
 
-    self.fontDisplayLabel = [self makeLabel:@"Menlo 12 pt" bold:NO];
-    self.fontDisplayLabel.frame = NSMakeRect(140, 160, 190, 22);
-    [self.editorView addSubview:self.fontDisplayLabel];
+    // Card 1: Font Selection (Height 120)
+    CGFloat fontCardHeight = 122;
+    CGFloat fontCardY = bounds.size.height - fontCardHeight - 16;
+    NSBox *fontCard = [self createCardWithTitle:@"Font Style & Size"
+                                          frame:NSMakeRect(24, fontCardY, cardWidth, fontCardHeight)];
 
-    NSButton *changeFontBtn = [NSButton buttonWithTitle:@"Select…" target:self action:@selector(changeFontClicked:)];
-    changeFontBtn.bezelStyle = NSBezelStyleRounded;
-    changeFontBtn.frame = NSMakeRect(340, 154, 100, 30);
-    [self.editorView addSubview:changeFontBtn];
+    NSTextField *fontLabel = [NSTextField labelWithString:@"Font:"];
+    fontLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
+    fontLabel.textColor = [self primaryTextColor];
+    fontLabel.frame = NSMakeRect(24, 54, 45, 22);
+    [fontCard addSubview:fontLabel];
 
-    // Tab Width
-    NSTextField *tabTitle = [self makeLabel:@"Tab width:" bold:YES];
-    tabTitle.frame = NSMakeRect(30, 115, 100, 22);
-    [self.editorView addSubview:tabTitle];
+    self.fontFamilyPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(72, 51, 260, 28) pullsDown:NO];
+    [self populateFontFamilies];
+    self.fontFamilyPopup.target = self;
+    self.fontFamilyPopup.action = @selector(fontFamilyChanged:);
+    [fontCard addSubview:self.fontFamilyPopup];
 
-    self.tabWidthPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(140, 112, 120, 26) pullsDown:NO];
+    NSTextField *sizeLabel = [NSTextField labelWithString:@"Size:"];
+    sizeLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
+    sizeLabel.textColor = [self primaryTextColor];
+    sizeLabel.frame = NSMakeRect(350, 54, 40, 22);
+    [fontCard addSubview:sizeLabel];
+
+    self.fontSizePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(394, 51, 92, 28) pullsDown:NO];
+    NSArray *sizes = @[@(8), @(9), @(10), @(11), @(12), @(13), @(14), @(15), @(16), @(18), @(20), @(24), @(28), @(32)];
+    for (NSNumber *sz in sizes) {
+        [self.fontSizePopup addItemWithTitle:[NSString stringWithFormat:@"%@ pt", sz]];
+        [self.fontSizePopup lastItem].tag = [sz integerValue];
+    }
+    self.fontSizePopup.target = self;
+    self.fontSizePopup.action = @selector(fontSizeChanged:);
+    [fontCard addSubview:self.fontSizePopup];
+
+    NSTextField *hintLabel = [self makeDescriptionLabel:@"Monospace fonts are recommended for clean code and text alignment."
+                                                  frame:NSMakeRect(72, 20, cardWidth - 96, 18)];
+    [fontCard addSubview:hintLabel];
+
+    [self.editorView addSubview:fontCard];
+
+    // Card 2: Live Preview (Height 150)
+    CGFloat prevCardHeight = 152;
+    CGFloat prevCardY = fontCardY - prevCardHeight - 14;
+    NSBox *previewCard = [self createCardWithTitle:@"Sample Text Preview"
+                                             frame:NSMakeRect(24, prevCardY, cardWidth, prevCardHeight)];
+
+    self.previewScrollView = [[NSScrollView alloc] initWithFrame:NSMakeRect(20, 18, cardWidth - 40, 95)];
+    self.previewScrollView.hasVerticalScroller = YES;
+    self.previewScrollView.borderType = NSLineBorder;
+    self.previewScrollView.wantsLayer = YES;
+    self.previewScrollView.layer.cornerRadius = 6.0;
+
+    self.fontPreviewTextView = [[NSTextView alloc] initWithFrame:self.previewScrollView.bounds];
+    self.fontPreviewTextView.editable = NO;
+    self.fontPreviewTextView.selectable = YES;
+    self.fontPreviewTextView.string =
+        @"The quick brown fox jumps over the lazy dog\n"
+        @"0123456789 — [({!@#$%^&*})];\n"
+        @"int main(int argc, char *argv[]) {\n"
+        @"    printf(\"Notepad for macOS\\n\");\n"
+        @"    return 0;\n"
+        @"}";
+    self.previewScrollView.documentView = self.fontPreviewTextView;
+    [previewCard addSubview:self.previewScrollView];
+
+    [self.editorView addSubview:previewCard];
+
+    // Card 3: Tab Settings (Height 116)
+    CGFloat tabCardHeight = 118;
+    CGFloat tabCardY = prevCardY - tabCardHeight - 14;
+    NSBox *tabCard = [self createCardWithTitle:@"Tab & Indentation"
+                                         frame:NSMakeRect(24, tabCardY, cardWidth, tabCardHeight)];
+
+    NSTextField *tabLabel = [NSTextField labelWithString:@"Tab size:"];
+    tabLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
+    tabLabel.textColor = [self primaryTextColor];
+    tabLabel.frame = NSMakeRect(24, 52, 70, 22);
+    [tabCard addSubview:tabLabel];
+
+    self.tabWidthPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(98, 49, 130, 28) pullsDown:NO];
     [self.tabWidthPopup addItemWithTitle:@"2 spaces"];
     [self.tabWidthPopup lastItem].tag = 2;
     [self.tabWidthPopup addItemWithTitle:@"4 spaces"];
@@ -141,209 +448,257 @@ static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
     [self.tabWidthPopup lastItem].tag = 8;
     self.tabWidthPopup.target = self;
     self.tabWidthPopup.action = @selector(tabWidthChanged:);
-    [self.editorView addSubview:self.tabWidthPopup];
+    [tabCard addSubview:self.tabWidthPopup];
 
-    // Checkboxes
-    self.useSpacesCheckbox = [NSButton checkboxWithTitle:@"Insert spaces instead of tabs"
+    self.useSpacesCheckbox = [NSButton checkboxWithTitle:@"Replace by space (use spaces instead of tabs)"
                                                   target:self
                                                   action:@selector(useSpacesToggled:)];
-    self.useSpacesCheckbox.frame = NSMakeRect(140, 72, 300, 24);
-    [self.editorView addSubview:self.useSpacesCheckbox];
+    self.useSpacesCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.useSpacesCheckbox.frame = NSMakeRect(24, 18, cardWidth - 48, 22);
+    [tabCard addSubview:self.useSpacesCheckbox];
 
-    self.wordWrapCheckbox = [NSButton checkboxWithTitle:@"Wrap long lines by default"
-                                                 target:self
-                                                 action:@selector(wordWrapToggled:)];
-    self.wordWrapCheckbox.frame = NSMakeRect(140, 38, 300, 24);
-    [self.editorView addSubview:self.wordWrapCheckbox];
+    [self.editorView addSubview:tabCard];
 }
 
-- (void)buildAppearanceView {
-    NSRect bounds = NSMakeRect(0, 0, 480, 200);
-    self.appearanceView = [[NSView alloc] initWithFrame:bounds];
+// 3. Dark Mode / Theme View
+- (void)buildThemeView:(NSRect)bounds {
+    self.themeView = [[NSView alloc] initWithFrame:bounds];
 
-    // Theme Mode
-    NSTextField *themeTitle = [self makeLabel:@"Theme:" bold:YES];
-    themeTitle.frame = NSMakeRect(30, 140, 100, 22);
-    [self.appearanceView addSubview:themeTitle];
+    CGFloat cardWidth = bounds.size.width - 48;
+    CGFloat cardHeight = 245;
+    CGFloat cardY = bounds.size.height - cardHeight - 24;
 
-    self.themeSegmentedControl = [NSSegmentedControl segmentedControlWithLabels:@[@"Light", @"Dark", @"System"]
+    NSBox *themeCard = [self createCardWithTitle:@"Color Theme"
+                                           frame:NSMakeRect(24, cardY, cardWidth, cardHeight)];
+
+    NSTextField *themeLabel = [NSTextField labelWithString:@"Mode:"];
+    themeLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
+    themeLabel.textColor = [self primaryTextColor];
+    themeLabel.frame = NSMakeRect(24, 156, 50, 22);
+    [themeCard addSubview:themeLabel];
+
+    self.themeSegmentedControl = [NSSegmentedControl segmentedControlWithLabels:@[@"Light", @"Dark", @"System Default"]
                                                                    trackingMode:NSSegmentSwitchTrackingSelectOne
                                                                          target:self
                                                                          action:@selector(themeChanged:)];
-    self.themeSegmentedControl.frame = NSMakeRect(140, 137, 260, 28);
-    [self.appearanceView addSubview:self.themeSegmentedControl];
+    self.themeSegmentedControl.frame = NSMakeRect(78, 152, 380, 30);
+    [themeCard addSubview:self.themeSegmentedControl];
 
-    // Line Numbers Checkbox
-    self.showLineNumbersCheckbox = [NSButton checkboxWithTitle:@"Show line numbers gutter"
-                                                        target:self
-                                                        action:@selector(lineNumbersToggled:)];
-    self.showLineNumbersCheckbox.frame = NSMakeRect(140, 85, 300, 24);
-    [self.appearanceView addSubview:self.showLineNumbersCheckbox];
+    NSString *descText =
+        @"• Light Theme\n"
+        @"  Classic bright canvas with pure white background and sharp black text.\n\n"
+        @"• Dark Theme\n"
+        @"  Modern deep dark theme engineered for reduced eye strain during extended editing.\n\n"
+        @"• System Default\n"
+        @"  Automatically adapts between Light and Dark mode based on your macOS System Appearance.";
 
-    // Status Bar Checkbox
-    self.showStatusBarCheckbox = [NSButton checkboxWithTitle:@"Show status bar"
-                                                      target:self
-                                                      action:@selector(statusBarToggled:)];
-    self.showStatusBarCheckbox.frame = NSMakeRect(140, 48, 300, 24);
-    [self.appearanceView addSubview:self.showStatusBarCheckbox];
+    NSTextField *descLabel = [self makeDescriptionLabel:descText
+                                                  frame:NSMakeRect(24, 20, cardWidth - 48, 115)];
+    [themeCard addSubview:descLabel];
+
+    [self.themeView addSubview:themeCard];
 }
 
-- (void)buildEncodingView {
-    NSRect bounds = NSMakeRect(0, 0, 480, 200);
+// 4. New Document & Encoding View
+- (void)buildEncodingView:(NSRect)bounds {
     self.encodingView = [[NSView alloc] initWithFrame:bounds];
 
-    NSTextField *encTitle = [self makeLabel:@"Default encoding:" bold:YES];
-    encTitle.frame = NSMakeRect(30, 135, 120, 22);
-    [self.encodingView addSubview:encTitle];
+    CGFloat cardWidth = bounds.size.width - 48;
+    CGFloat cardHeight = 245;
+    CGFloat cardY = bounds.size.height - cardHeight - 24;
 
-    self.encodingPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(160, 132, 260, 26) pullsDown:NO];
+    NSBox *encCard = [self createCardWithTitle:@"New Document & Default Encoding"
+                                         frame:NSMakeRect(24, cardY, cardWidth, cardHeight)];
+
+    NSTextField *encLabel = [NSTextField labelWithString:@"Encoding:"];
+    encLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
+    encLabel.textColor = [self primaryTextColor];
+    encLabel.frame = NSMakeRect(24, 156, 75, 22);
+    [encCard addSubview:encLabel];
+
+    self.encodingPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(105, 153, 310, 28) pullsDown:NO];
     for (NSDictionary *item in [PreferencesManager supportedEncodings]) {
         [self.encodingPopup addItemWithTitle:item[@"name"]];
         [self.encodingPopup lastItem].tag = [item[@"encoding"] integerValue];
     }
     self.encodingPopup.target = self;
     self.encodingPopup.action = @selector(encodingChanged:);
-    [self.encodingView addSubview:self.encodingPopup];
+    [encCard addSubview:self.encodingPopup];
 
-    NSTextField *infoNote = [self makeLabel:@"Applied to newly created documents and used as fallback when opening files without a Byte Order Mark (BOM)." bold:NO];
-    infoNote.textColor = [NSColor secondaryLabelColor];
-    infoNote.font = [NSFont systemFontOfSize:11.0];
-    infoNote.frame = NSMakeRect(160, 60, 280, 60);
-    [self.encodingView addSubview:infoNote];
+    NSString *noteText =
+        @"• New Documents & Live Synchronization:\n"
+        @"  This character encoding is applied when creating new untitled documents.\n"
+        @"  Changing it here will immediately synchronize with the active status bar footer.\n\n"
+        @"• Fallback Decoding:\n"
+        @"  Also utilized as the preferred decoding format when opening legacy text files\n"
+        @"  that do not contain an explicit Byte Order Mark (BOM).";
+
+    NSTextField *noteLabel = [self makeDescriptionLabel:noteText
+                                                  frame:NSMakeRect(24, 20, cardWidth - 48, 115)];
+    [encCard addSubview:noteLabel];
+
+    [self.encodingView addSubview:encCard];
 }
 
-- (void)buildAdvancedView {
-    NSRect bounds = NSMakeRect(0, 0, 480, 180);
-    self.advancedView = [[NSView alloc] initWithFrame:bounds];
+// 5. Backup & Advanced View
+- (void)buildBackupView:(NSRect)bounds {
+    self.backupView = [[NSView alloc] initWithFrame:bounds];
 
-    // Backup On Save
-    self.backupOnSaveCheckbox = [NSButton checkboxWithTitle:@"Create backup file (.bak) before saving"
+    CGFloat cardWidth = bounds.size.width - 48;
+
+    // Card 1: Backup on Save (Height 140)
+    CGFloat backupCardHeight = 142;
+    CGFloat backupCardY = bounds.size.height - backupCardHeight - 24;
+    NSBox *backupCard = [self createCardWithTitle:@"Backup on Save"
+                                            frame:NSMakeRect(24, backupCardY, cardWidth, backupCardHeight)];
+
+    self.backupOnSaveCheckbox = [NSButton checkboxWithTitle:@"Enable backup on save (.bak)"
                                                      target:self
                                                      action:@selector(backupOnSaveToggled:)];
-    self.backupOnSaveCheckbox.frame = NSMakeRect(50, 115, 380, 24);
-    [self.advancedView addSubview:self.backupOnSaveCheckbox];
+    self.backupOnSaveCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.backupOnSaveCheckbox.frame = NSMakeRect(24, 68, cardWidth - 48, 24);
+    [backupCard addSubview:self.backupOnSaveCheckbox];
 
-    NSTextField *backupNote = [self makeLabel:@"Saves an unmodified copy of the file with a .bak extension prior to overwriting." bold:NO];
-    backupNote.textColor = [NSColor secondaryLabelColor];
-    backupNote.font = [NSFont systemFontOfSize:11.0];
-    backupNote.frame = NSMakeRect(74, 82, 350, 32);
-    [self.advancedView addSubview:backupNote];
+    NSString *backupText =
+        @"Creates a duplicate copy of the existing file with a .bak extension prior to writing new changes, protecting against accidental data loss.";
+    NSTextField *backupDesc = [self makeDescriptionLabel:backupText
+                                                   frame:NSMakeRect(48, 20, cardWidth - 72, 40)];
+    [backupCard addSubview:backupDesc];
 
-    // Auto-indent
-    self.autoIndentCheckbox = [NSButton checkboxWithTitle:@"Automatically indent new lines"
+    [self.backupView addSubview:backupCard];
+
+    // Card 2: Auto-Indentation (Height 136)
+    CGFloat indentCardHeight = 138;
+    CGFloat indentCardY = backupCardY - indentCardHeight - 16;
+    NSBox *indentCard = [self createCardWithTitle:@"Auto-Indentation"
+                                            frame:NSMakeRect(24, indentCardY, cardWidth, indentCardHeight)];
+
+    self.autoIndentCheckbox = [NSButton checkboxWithTitle:@"Auto-indent new lines on Return"
                                                    target:self
                                                    action:@selector(autoIndentToggled:)];
-    self.autoIndentCheckbox.frame = NSMakeRect(50, 48, 380, 24);
-    [self.advancedView addSubview:self.autoIndentCheckbox];
+    self.autoIndentCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.autoIndentCheckbox.frame = NSMakeRect(24, 66, cardWidth - 48, 24);
+    [indentCard addSubview:self.autoIndentCheckbox];
+
+    NSString *indentText =
+        @"When pressing Return/Enter, the new line will automatically match the leading indentation depth of the preceding line.";
+    NSTextField *indentDesc = [self makeDescriptionLabel:indentText
+                                                   frame:NSMakeRect(48, 20, cardWidth - 72, 38)];
+    [indentCard addSubview:indentDesc];
+
+    [self.backupView addSubview:indentCard];
 }
 
-#pragma mark - Helper
+#pragma mark - Font Population Helper
 
-- (NSTextField *)makeLabel:(NSString *)text bold:(BOOL)bold {
-    NSTextField *label = [NSTextField labelWithString:text];
-    label.editable = NO;
-    label.selectable = NO;
-    label.bezeled = NO;
-    label.drawsBackground = NO;
-    if (bold) {
-        label.font = [NSFont boldSystemFontOfSize:13.0];
-    } else {
-        label.font = [NSFont systemFontOfSize:13.0];
+- (void)populateFontFamilies {
+    [self.fontFamilyPopup removeAllItems];
+
+    NSArray *preferredMonospace = @[
+        @"Menlo",
+        @"Monaco",
+        @"SF Mono",
+        @"Courier New",
+        @"Courier",
+        @"JetBrains Mono",
+        @"Fira Code",
+        @"Consolas",
+        @"Andale Mono"
+    ];
+
+    NSFontManager *fm = [NSFontManager sharedFontManager];
+    NSArray<NSString *> *allFamilies = [fm availableFontFamilies];
+
+    // 1. Monospace section
+    NSMenuItem *monoHeader = [[NSMenuItem alloc] initWithTitle:@"── Monospace Fonts ──" action:nil keyEquivalent:@""];
+    [monoHeader setEnabled:NO];
+    [self.fontFamilyPopup.menu addItem:monoHeader];
+
+    for (NSString *name in preferredMonospace) {
+        if ([allFamilies containsObject:name]) {
+            [self.fontFamilyPopup addItemWithTitle:name];
+        }
     }
-    return label;
+
+    // 2. Separator & Other System Fonts
+    [self.fontFamilyPopup.menu addItem:[NSMenuItem separatorItem]];
+    NSMenuItem *systemHeader = [[NSMenuItem alloc] initWithTitle:@"── All System Fonts ──" action:nil keyEquivalent:@""];
+    [systemHeader setEnabled:NO];
+    [self.fontFamilyPopup.menu addItem:systemHeader];
+
+    for (NSString *name in allFamilies) {
+        if (![preferredMonospace containsObject:name]) {
+            [self.fontFamilyPopup addItemWithTitle:name];
+        }
+    }
 }
 
-#pragma mark - Tab Switching
+#pragma mark - NSTableViewDataSource & Delegate
 
-- (void)switchToTab:(NSString *)identifier animate:(BOOL)animate {
-    _currentTabIdentifier = [identifier copy];
+- (NSInteger)numberOfRowsInTableView:(NSTableView *)tableView {
+    return self.categories.count;
+}
+
+- (NSView *)tableView:(NSTableView *)tableView viewForTableColumn:(NSTableColumn *)tableColumn row:(NSInteger)row {
+    NSTableCellView *cell = [tableView makeViewWithIdentifier:@"CategoryCell" owner:self];
+    if (!cell) {
+        cell = [[NSTableCellView alloc] initWithFrame:NSMakeRect(0, 0, tableColumn.width, 36)];
+        cell.identifier = @"CategoryCell";
+
+        NSImageView *iconView = [[NSImageView alloc] initWithFrame:NSMakeRect(10, 8, 20, 20)];
+        iconView.imageScaling = NSImageScaleProportionallyDown;
+        [cell addSubview:iconView];
+        cell.imageView = iconView;
+
+        NSTextField *textField = [NSTextField labelWithString:@""];
+        textField.frame = NSMakeRect(38, 8, tableColumn.width - 48, 20);
+        textField.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
+        [cell addSubview:textField];
+        cell.textField = textField;
+    }
+
+    NPCategoryItem *item = self.categories[row];
+    cell.textField.stringValue = item.title;
+    cell.textField.textColor = [self primaryTextColor];
+
+    NSImage *img = nil;
+    if (@available(macOS 11.0, *)) {
+        img = [NSImage imageWithSystemSymbolName:item.systemSymbol accessibilityDescription:item.title];
+    }
+    if (!img) {
+        img = [NSImage imageNamed:item.iconName];
+    }
+    cell.imageView.image = img;
+
+    return cell;
+}
+
+- (void)tableViewSelectionDidChange:(NSNotification *)notification {
+    NSInteger selectedRow = self.tableView.selectedRow;
+    if (selectedRow >= 0 && selectedRow < (NSInteger)self.categories.count) {
+        [self showCategoryIndex:selectedRow];
+    }
+}
+
+- (void)showCategoryIndex:(NSInteger)index {
+    [[self.detailContainer subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
 
     NSView *targetView = nil;
-    if ([identifier isEqualToString:kToolbarEditor]) {
-        targetView = self.editorView;
-    } else if ([identifier isEqualToString:kToolbarAppearance]) {
-        targetView = self.appearanceView;
-    } else if ([identifier isEqualToString:kToolbarEncoding]) {
-        targetView = self.encodingView;
-    } else if ([identifier isEqualToString:kToolbarAdvanced]) {
-        targetView = self.advancedView;
+    switch (index) {
+        case 0: targetView = self.generalView; break;
+        case 1: targetView = self.editorView; break;
+        case 2: targetView = self.themeView; break;
+        case 3: targetView = self.encodingView; break;
+        case 4: targetView = self.backupView; break;
+        default: targetView = self.generalView; break;
     }
 
-    if (!targetView) return;
-
-    // Adjust window frame to target view height
-    NSRect contentFrame = self.window.contentView.frame;
-    contentFrame.size.height = targetView.frame.size.height;
-    contentFrame.size.width = targetView.frame.size.width;
-
-    NSRect newWinFrame = [self.window frameRectForContentRect:contentFrame];
-    newWinFrame.origin.x = self.window.frame.origin.x;
-    newWinFrame.origin.y = self.window.frame.origin.y + (self.window.frame.size.height - newWinFrame.size.height);
-
-    [[self.containerView subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
-    targetView.frame = self.containerView.bounds;
-    targetView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [self.containerView addSubview:targetView];
-
-    [self.window setFrame:newWinFrame display:YES animate:animate];
-}
-
-#pragma mark - NSToolbarDelegate
-
-- (NSArray<NSToolbarItemIdentifier> *)toolbarDefaultItemIdentifiers:(NSToolbar *)toolbar {
-    return @[kToolbarEditor, kToolbarAppearance, kToolbarEncoding, kToolbarAdvanced];
-}
-
-- (NSArray<NSToolbarItemIdentifier> *)toolbarAllowedItemIdentifiers:(NSToolbar *)toolbar {
-    return @[kToolbarEditor, kToolbarAppearance, kToolbarEncoding, kToolbarAdvanced];
-}
-
-- (NSArray<NSToolbarItemIdentifier> *)toolbarSelectableItemIdentifiers:(NSToolbar *)toolbar {
-    return @[kToolbarEditor, kToolbarAppearance, kToolbarEncoding, kToolbarAdvanced];
-}
-
-- (NSToolbarItem *)toolbar:(NSToolbar *)toolbar
-     itemForItemIdentifier:(NSToolbarItemIdentifier)itemIdentifier
- willBeInsertedIntoToolbar:(BOOL)flag {
-    NSToolbarItem *item = [[NSToolbarItem alloc] initWithItemIdentifier:itemIdentifier];
-    item.target = self;
-    item.action = @selector(toolbarItemClicked:);
-
-    if ([itemIdentifier isEqualToString:kToolbarEditor]) {
-        item.label = @"Editor";
-        if (@available(macOS 11.0, *)) {
-            item.image = [NSImage imageWithSystemSymbolName:@"square.and.pencil" accessibilityDescription:@"Editor"];
-        } else {
-            item.image = [NSImage imageNamed:NSImageNamePreferencesGeneral];
-        }
-    } else if ([itemIdentifier isEqualToString:kToolbarAppearance]) {
-        item.label = @"Appearance";
-        if (@available(macOS 11.0, *)) {
-            item.image = [NSImage imageWithSystemSymbolName:@"paintbrush" accessibilityDescription:@"Appearance"];
-        } else {
-            item.image = [NSImage imageNamed:NSImageNameColorPanel];
-        }
-    } else if ([itemIdentifier isEqualToString:kToolbarEncoding]) {
-        item.label = @"Encoding";
-        if (@available(macOS 11.0, *)) {
-            item.image = [NSImage imageWithSystemSymbolName:@"character.book.closed" accessibilityDescription:@"Encoding"];
-        } else {
-            item.image = [NSImage imageNamed:NSImageNameMultipleDocuments];
-        }
-    } else if ([itemIdentifier isEqualToString:kToolbarAdvanced]) {
-        item.label = @"Advanced";
-        if (@available(macOS 11.0, *)) {
-            item.image = [NSImage imageWithSystemSymbolName:@"gearshape" accessibilityDescription:@"Advanced"];
-        } else {
-            item.image = [NSImage imageNamed:NSImageNameAdvanced];
-        }
+    if (targetView) {
+        targetView.frame = self.detailContainer.bounds;
+        targetView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+        [self.detailContainer addSubview:targetView];
+        [self updateFontPreview];
     }
-
-    return item;
-}
-
-- (void)toolbarItemClicked:(NSToolbarItem *)item {
-    [self switchToTab:item.itemIdentifier animate:YES];
 }
 
 #pragma mark - Populate Data
@@ -351,54 +706,78 @@ static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
 - (void)reloadPreferencesValues {
     PreferencesManager *prefs = [PreferencesManager sharedManager];
 
-    // Editor
-    self.fontDisplayLabel.stringValue = [NSString stringWithFormat:@"%@ %ld pt", prefs.fontName ?: @"Menlo", (long)prefs.fontSize];
-    [self.tabWidthPopup selectItemWithTag:prefs.tabWidth];
-    self.useSpacesCheckbox.state = prefs.useSpaces ? NSControlStateValueOn : NSControlStateValueOff;
+    // General
+    self.showStatusBarCheckbox.state = prefs.showStatusBar ? NSControlStateValueOn : NSControlStateValueOff;
+    self.showLineNumbersCheckbox.state = prefs.showLineNumbers ? NSControlStateValueOn : NSControlStateValueOff;
     self.wordWrapCheckbox.state = prefs.wordWrap ? NSControlStateValueOn : NSControlStateValueOff;
 
-    // Appearance
+    // Editor: Font family & size
+    NSString *currentFont = prefs.fontName ?: @"Menlo";
+    if ([self.fontFamilyPopup itemWithTitle:currentFont]) {
+        [self.fontFamilyPopup selectItemWithTitle:currentFont];
+    } else {
+        [self.fontFamilyPopup addItemWithTitle:currentFont];
+        [self.fontFamilyPopup selectItemWithTitle:currentFont];
+    }
+
+    [self.fontSizePopup selectItemWithTag:prefs.fontSize];
+    [self.tabWidthPopup selectItemWithTag:prefs.tabWidth];
+    self.useSpacesCheckbox.state = prefs.useSpaces ? NSControlStateValueOn : NSControlStateValueOff;
+
+    // Theme
     NSInteger segment = 2; // System default
     if (prefs.themeMode == NPThemeModeLight) segment = 0;
     else if (prefs.themeMode == NPThemeModeDark) segment = 1;
     self.themeSegmentedControl.selectedSegment = segment;
-    self.showLineNumbersCheckbox.state = prefs.showLineNumbers ? NSControlStateValueOn : NSControlStateValueOff;
-    self.showStatusBarCheckbox.state = prefs.showStatusBar ? NSControlStateValueOn : NSControlStateValueOff;
 
     // Encoding
     [self.encodingPopup selectItemWithTag:prefs.defaultEncoding];
 
-    // Advanced
+    // Backup & Advanced
     self.backupOnSaveCheckbox.state = prefs.backupOnSave ? NSControlStateValueOn : NSControlStateValueOff;
     self.autoIndentCheckbox.state = prefs.autoIndent ? NSControlStateValueOn : NSControlStateValueOff;
+
+    [self updateFontPreview];
+}
+
+- (void)updateFontPreview {
+    if (!self.fontPreviewTextView) return;
+
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    NSString *fontName = prefs.fontName ?: @"Menlo";
+    NSInteger fontSize = prefs.fontSize > 0 ? prefs.fontSize : 12;
+
+    NSFont *font = [NSFont fontWithName:fontName size:fontSize] ?: [NSFont monospacedSystemFontOfSize:fontSize weight:NSFontWeightRegular];
+    self.fontPreviewTextView.font = font;
+
+    self.fontPreviewTextView.backgroundColor = [self previewBgColor];
+    self.fontPreviewTextView.textColor = [self previewTextColor];
 }
 
 - (void)handlePreferencesChanged:(NSNotification *)notification {
+    [self applyThemeColors];
     [self reloadPreferencesValues];
 }
 
 #pragma mark - Actions
 
-- (void)changeFontClicked:(id)sender {
-    PreferencesManager *prefs = [PreferencesManager sharedManager];
-    NSFontManager *fontManager = [NSFontManager sharedFontManager];
-    fontManager.target = self;
-    fontManager.action = @selector(changeFont:);
-
-    NSFont *font = [NSFont fontWithName:prefs.fontName size:prefs.fontSize] ?: [NSFont monospacedSystemFontOfSize:prefs.fontSize weight:NSFontWeightRegular];
-    [fontManager setSelectedFont:font isMultiple:NO];
-    [fontManager orderFrontFontPanel:self];
+- (void)fontFamilyChanged:(id)sender {
+    NSString *selectedFont = self.fontFamilyPopup.titleOfSelectedItem;
+    if (selectedFont.length > 0 && ![selectedFont hasPrefix:@"──"]) {
+        PreferencesManager *prefs = [PreferencesManager sharedManager];
+        prefs.fontName = selectedFont;
+        [prefs savePreferences];
+        [self updateFontPreview];
+    }
 }
 
-- (void)changeFont:(id)sender {
-    NSFontManager *fontManager = [NSFontManager sharedFontManager];
-    PreferencesManager *prefs = [PreferencesManager sharedManager];
-    NSFont *currentFont = [NSFont fontWithName:prefs.fontName size:prefs.fontSize] ?: [NSFont monospacedSystemFontOfSize:12.0 weight:NSFontWeightRegular];
-    NSFont *newFont = [fontManager convertFont:currentFont];
-    if (newFont) {
-        prefs.fontName = newFont.fontName;
-        prefs.fontSize = (NSInteger)newFont.pointSize;
+- (void)fontSizeChanged:(id)sender {
+    NSInteger selectedSize = self.fontSizePopup.selectedTag;
+    if (selectedSize > 0) {
+        PreferencesManager *prefs = [PreferencesManager sharedManager];
+        prefs.fontSize = selectedSize;
         [prefs savePreferences];
+        [self updateFontPreview];
     }
 }
 
@@ -431,6 +810,7 @@ static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
         prefs.themeMode = NPThemeModeSystem;
     }
     [prefs savePreferences];
+    [self applyThemeColors];
 }
 
 - (void)lineNumbersToggled:(id)sender {
@@ -463,7 +843,12 @@ static NSString *const kToolbarAdvanced   = @"ToolbarAdvanced";
     [prefs savePreferences];
 }
 
+- (void)closeButtonClicked:(id)sender {
+    [self.window close];
+}
+
 - (void)showWindow:(nullable id)sender {
+    [self applyThemeColors];
     [self reloadPreferencesValues];
     [super showWindow:sender];
     [self.window makeKeyAndOrderFront:sender];
