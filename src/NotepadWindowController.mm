@@ -7,6 +7,7 @@
 #import "FindReplaceController.h"
 #import "PreferencesManager.h"
 #import "Scintilla.h"
+#import "ScintillaPrintView.h"
 
 @interface NotepadWindowController ()
 @end
@@ -632,9 +633,19 @@
 
 - (IBAction)printDocument:(nullable id)sender {
     if (!self.editor) return;
-    NSPrintInfo *printInfo = [NSPrintInfo sharedPrintInfo];
-    NSPrintOperation *op = [NSPrintOperation printOperationWithView:self.editor printInfo:printInfo];
-    [op runOperationModalForWindow:self.window delegate:nil didRunSelector:NULL contextInfo:NULL];
+    NSPrintInfo *pi = [NSPrintInfo sharedPrintInfo];
+    // Create custom NSView that calls SCI_FORMATRANGE in drawRect:
+    ScintillaPrintView *pv = [[ScintillaPrintView alloc] initWithEditor:self.editor
+                                                              printInfo:pi];
+    if (self.currentTab.title.length > 0) {
+        pv.documentTitle = self.currentTab.title;
+    }
+    NSPrintOperation *op = [NSPrintOperation printOperationWithView:pv printInfo:pi];
+    if (self.currentTab.title.length > 0) {
+        [op setJobTitle:self.currentTab.title];
+    }
+    [op runOperationModalForWindow:self.window delegate:nil
+                   didRunSelector:NULL contextInfo:NULL];
 }
 
 - (IBAction)undo:(nullable id)sender {

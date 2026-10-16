@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 - (void)reloadTabs;
 - (void)updateTheme;
+- (void)ensureTabVisibleAtIndex:(NSInteger)index;
 
 @end
 

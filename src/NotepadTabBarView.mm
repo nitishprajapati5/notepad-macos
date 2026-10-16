@@ -6,6 +6,9 @@
 @property (nonatomic, assign) NSInteger hoveredTabIndex;
 @property (nonatomic, assign) NSInteger hoveredCloseIndex;
 @property (nonatomic, assign) BOOL isPlusHovered;
+@property (nonatomic, assign) BOOL isLeftScrollHovered;
+@property (nonatomic, assign) BOOL isRightScrollHovered;
+@property (nonatomic, assign) CGFloat scrollOffset;
 @property (nonatomic, strong) NSTrackingArea *trackingArea;
 
 @end
@@ -20,6 +23,9 @@
         _hoveredTabIndex = -1;
         _hoveredCloseIndex = -1;
         _isPlusHovered = NO;
+        _isLeftScrollHovered = NO;
+        _isRightScrollHovered = NO;
+        _scrollOffset = 0.0;
     }
     return self;
 }
@@ -53,14 +59,80 @@
 
 - (CGFloat)tabWidth {
     if (self.tabs.count == 0) return 140.0;
-    CGFloat available = self.bounds.size.width - [self leftOffset] - 50.0;
+    CGFloat available = self.bounds.size.width - [self leftOffset] - 70.0;
     CGFloat w = (available / self.tabs.count) - 3.0;
-    return MAX(110.0, MIN(175.0, w));
+    return MAX(120.0, MIN(165.0, w));
+}
+
+- (CGFloat)totalContentWidth {
+    CGFloat tWidth = [self tabWidth];
+    return [self leftOffset] + self.tabs.count * (tWidth + 3.0) + 26.0 + 12.0;
+}
+
+- (BOOL)canScrollTabs {
+    return [self totalContentWidth] > self.bounds.size.width;
+}
+
+- (CGFloat)availableWidthForTabs {
+    return [self canScrollTabs] ? (self.bounds.size.width - 64.0) : self.bounds.size.width;
+}
+
+- (CGFloat)maxScrollOffset {
+    CGFloat maxScroll = [self totalContentWidth] - [self availableWidthForTabs];
+    return MAX(0.0, maxScroll);
+}
+
+- (void)clampScrollOffset {
+    CGFloat maxScroll = [self maxScrollOffset];
+    if (_scrollOffset > maxScroll) {
+        _scrollOffset = maxScroll;
+    }
+    if (_scrollOffset < 0.0) {
+        _scrollOffset = 0.0;
+    }
+}
+
+- (void)scrollBy:(CGFloat)delta {
+    _scrollOffset += delta;
+    [self clampScrollOffset];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)ensureTabVisibleAtIndex:(NSInteger)index {
+    if (index < 0 || index >= (NSInteger)self.tabs.count) return;
+
+    CGFloat tWidth = [self tabWidth];
+    CGFloat leftEdge = [self leftOffset] + index * (tWidth + 3.0);
+    CGFloat rightEdge = leftEdge + tWidth;
+
+    CGFloat visibleLeft = _scrollOffset + [self leftOffset];
+    CGFloat availableWidth = [self availableWidthForTabs];
+    CGFloat visibleRight = _scrollOffset + availableWidth;
+
+    if (leftEdge < visibleLeft) {
+        _scrollOffset = MAX(0.0, leftEdge - [self leftOffset]);
+        [self setNeedsDisplay:YES];
+    } else if (rightEdge > visibleRight) {
+        _scrollOffset = MAX(0.0, rightEdge - availableWidth + 8.0);
+        [self clampScrollOffset];
+        [self setNeedsDisplay:YES];
+    }
+}
+
+- (void)setSelectedIndex:(NSInteger)selectedIndex {
+    _selectedIndex = selectedIndex;
+    [self ensureTabVisibleAtIndex:selectedIndex];
+    [self setNeedsDisplay:YES];
+}
+
+- (void)setFrame:(NSRect)frame {
+    [super setFrame:frame];
+    [self clampScrollOffset];
 }
 
 - (NSRect)rectForTabAtIndex:(NSInteger)index {
     CGFloat tWidth = [self tabWidth];
-    CGFloat x = [self leftOffset] + index * (tWidth + 3.0);
+    CGFloat x = [self leftOffset] + index * (tWidth + 3.0) - _scrollOffset;
     return NSMakeRect(x, 1.0, tWidth, self.bounds.size.height - 1.0);
 }
 
@@ -73,13 +145,27 @@
 
 - (NSRect)plusButtonRect {
     CGFloat tWidth = [self tabWidth];
-    CGFloat x = [self leftOffset] + self.tabs.count * (tWidth + 3.0) + 6.0;
+    CGFloat x = [self leftOffset] + self.tabs.count * (tWidth + 3.0) + 6.0 - _scrollOffset;
     CGFloat sz = 22.0;
     CGFloat y = (self.bounds.size.height - sz) / 2.0;
     return NSMakeRect(x, y, sz, sz);
 }
 
+- (NSRect)leftScrollButtonRect {
+    CGFloat sz = 22.0;
+    CGFloat y = (self.bounds.size.height - sz) / 2.0;
+    return NSMakeRect(self.bounds.size.width - 56.0, y, sz, sz);
+}
+
+- (NSRect)rightScrollButtonRect {
+    CGFloat sz = 22.0;
+    CGFloat y = (self.bounds.size.height - sz) / 2.0;
+    return NSMakeRect(self.bounds.size.width - 28.0, y, sz, sz);
+}
+
 - (void)reloadTabs {
+    [self clampScrollOffset];
+    [self ensureTabVisibleAtIndex:self.selectedIndex];
     [self setNeedsDisplay:YES];
 }
 
@@ -89,35 +175,70 @@
 
 #pragma mark - Mouse Events
 
+- (void)scrollWheel:(NSEvent *)event {
+    if ([self canScrollTabs]) {
+        CGFloat delta = event.scrollingDeltaX;
+        // Support vertical scrollwheel / shift-scrolling for horizontal tab navigation
+        if (fabs(delta) < 0.1 && (event.modifierFlags & NSEventModifierFlagShift || fabs(event.scrollingDeltaY) > 0.1)) {
+            delta = -event.scrollingDeltaY;
+        }
+        if (event.hasPreciseScrollingDeltas) {
+            [self scrollBy:-delta];
+        } else {
+            [self scrollBy:-delta * 14.0];
+        }
+    } else {
+        [super scrollWheel:event];
+    }
+}
+
 - (void)mouseMoved:(NSEvent *)event {
     NSPoint location = [self convertPoint:event.locationInWindow fromView:nil];
     NSInteger oldHoverTab = self.hoveredTabIndex;
     NSInteger oldHoverClose = self.hoveredCloseIndex;
     BOOL oldPlusHover = self.isPlusHovered;
+    BOOL oldLeftScrollHover = self.isLeftScrollHovered;
+    BOOL oldRightScrollHover = self.isRightScrollHovered;
 
     self.hoveredTabIndex = -1;
     self.hoveredCloseIndex = -1;
     self.isPlusHovered = NO;
+    self.isLeftScrollHovered = NO;
+    self.isRightScrollHovered = NO;
 
-    for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
-        NSRect tabRect = [self rectForTabAtIndex:i];
-        if (NSPointInRect(location, tabRect)) {
-            self.hoveredTabIndex = i;
-            NSRect closeRect = [self closeButtonRectForTabRect:tabRect];
-            if (NSPointInRect(location, closeRect)) {
-                self.hoveredCloseIndex = i;
-            }
-            break;
+    if ([self canScrollTabs]) {
+        if (NSPointInRect(location, [self leftScrollButtonRect])) {
+            self.isLeftScrollHovered = YES;
+        } else if (NSPointInRect(location, [self rightScrollButtonRect])) {
+            self.isRightScrollHovered = YES;
         }
     }
 
-    if (NSPointInRect(location, [self plusButtonRect])) {
-        self.isPlusHovered = YES;
+    CGFloat clipRight = [self availableWidthForTabs];
+
+    if (!self.isLeftScrollHovered && !self.isRightScrollHovered && location.x <= clipRight) {
+        for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
+            NSRect tabRect = [self rectForTabAtIndex:i];
+            if (NSPointInRect(location, tabRect)) {
+                self.hoveredTabIndex = i;
+                NSRect closeRect = [self closeButtonRectForTabRect:tabRect];
+                if (NSPointInRect(location, closeRect)) {
+                    self.hoveredCloseIndex = i;
+                }
+                break;
+            }
+        }
+
+        if (NSPointInRect(location, [self plusButtonRect])) {
+            self.isPlusHovered = YES;
+        }
     }
 
     if (oldHoverTab != self.hoveredTabIndex ||
         oldHoverClose != self.hoveredCloseIndex ||
-        oldPlusHover != self.isPlusHovered) {
+        oldPlusHover != self.isPlusHovered ||
+        oldLeftScrollHover != self.isLeftScrollHovered ||
+        oldRightScrollHover != self.isRightScrollHovered) {
         [self setNeedsDisplay:YES];
     }
 }
@@ -126,13 +247,34 @@
     self.hoveredTabIndex = -1;
     self.hoveredCloseIndex = -1;
     self.isPlusHovered = NO;
+    self.isLeftScrollHovered = NO;
+    self.isRightScrollHovered = NO;
     [self setNeedsDisplay:YES];
 }
 
 - (void)mouseDown:(NSEvent *)event {
     NSPoint location = [self convertPoint:event.locationInWindow fromView:nil];
 
-    // Check plus button
+    // 1. Check Scroll Buttons
+    if ([self canScrollTabs]) {
+        if (NSPointInRect(location, [self leftScrollButtonRect])) {
+            CGFloat step = [self tabWidth] + 3.0;
+            [self scrollBy:-step];
+            return;
+        }
+        if (NSPointInRect(location, [self rightScrollButtonRect])) {
+            CGFloat step = [self tabWidth] + 3.0;
+            [self scrollBy:step];
+            return;
+        }
+    }
+
+    CGFloat clipRight = [self availableWidthForTabs];
+    if ([self canScrollTabs] && location.x > clipRight) {
+        return; // Ignore clicks in scroll button margin area
+    }
+
+    // 2. Check [+] Plus button
     if (NSPointInRect(location, [self plusButtonRect])) {
         if ([self.delegate respondsToSelector:@selector(tabBarViewDidClickNewTab:)]) {
             [self.delegate tabBarViewDidClickNewTab:self];
@@ -140,7 +282,7 @@
         return;
     }
 
-    // Check tabs
+    // 3. Check tabs
     for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
         NSRect tabRect = [self rectForTabAtIndex:i];
         if (NSPointInRect(location, tabRect)) {
@@ -158,7 +300,7 @@
         }
     }
 
-    // Double click on empty tab bar area opens new tab (Notepad++ feature)
+    // 4. Double click on empty tab bar area opens new tab (Notepad++ feature)
     if (event.clickCount == 2) {
         if ([self.delegate respondsToSelector:@selector(tabBarViewDidClickNewTab:)]) {
             [self.delegate tabBarViewDidClickNewTab:self];
@@ -170,6 +312,9 @@
     // Middle click closes tab (buttonNumber 2)
     if (event.buttonNumber == 2) {
         NSPoint location = [self convertPoint:event.locationInWindow fromView:nil];
+        CGFloat clipRight = [self availableWidthForTabs];
+        if ([self canScrollTabs] && location.x > clipRight) return;
+
         for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
             NSRect tabRect = [self rectForTabAtIndex:i];
             if (NSPointInRect(location, tabRect)) {
@@ -252,6 +397,61 @@
     [labelPath stroke];
 }
 
+- (void)drawScrollButtonInRect:(NSRect)rect isLeft:(BOOL)isLeft enabled:(BOOL)enabled hovered:(BOOL)hovered isDark:(BOOL)isDark {
+    // Circular background
+    NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:rect];
+
+    NSColor *circleBg;
+    if (hovered && enabled) {
+        circleBg = isDark ?
+            [NSColor colorWithCalibratedWhite:0.35 alpha:0.8] :
+            [NSColor colorWithCalibratedWhite:0.75 alpha:0.8];
+    } else {
+        circleBg = isDark ?
+            [NSColor colorWithCalibratedWhite:0.20 alpha:0.6] :
+            [NSColor colorWithCalibratedWhite:0.82 alpha:0.6];
+    }
+    [circleBg setFill];
+    [circle fill];
+
+    // Chevron arrow color
+    NSColor *chevronColor;
+    if (!enabled) {
+        chevronColor = isDark ?
+            [NSColor colorWithCalibratedWhite:0.38 alpha:0.35] :
+            [NSColor colorWithCalibratedWhite:0.60 alpha:0.35];
+    } else if (hovered) {
+        chevronColor = isDark ?
+            [NSColor whiteColor] :
+            [NSColor blackColor];
+    } else {
+        chevronColor = isDark ?
+            [NSColor colorWithCalibratedWhite:0.90 alpha:0.95] :
+            [NSColor colorWithCalibratedWhite:0.20 alpha:0.95];
+    }
+
+    CGFloat cx = rect.origin.x + rect.size.width / 2.0;
+    CGFloat cy = rect.origin.y + rect.size.height / 2.0;
+
+    NSBezierPath *chevron = [NSBezierPath bezierPath];
+    chevron.lineWidth = 1.6;
+    chevron.lineCapStyle = NSLineCapStyleRound;
+    chevron.lineJoinStyle = NSLineJoinStyleRound;
+
+    if (isLeft) {
+        [chevron moveToPoint:NSMakePoint(cx + 2.0, cy + 4.0)];
+        [chevron lineToPoint:NSMakePoint(cx - 2.5, cy)];
+        [chevron lineToPoint:NSMakePoint(cx + 2.0, cy - 4.0)];
+    } else {
+        [chevron moveToPoint:NSMakePoint(cx - 2.0, cy + 4.0)];
+        [chevron lineToPoint:NSMakePoint(cx + 2.5, cy)];
+        [chevron lineToPoint:NSMakePoint(cx - 2.0, cy - 4.0)];
+    }
+
+    [chevronColor setStroke];
+    [chevron stroke];
+}
+
 #pragma mark - Drawing
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -273,10 +473,24 @@
     [bottomBorderColor setFill];
     NSRectFill(NSMakeRect(0, 0, self.bounds.size.width, 1.0));
 
+    BOOL hasScroll = [self canScrollTabs];
+    CGFloat clipRight = [self availableWidthForTabs];
+
+    // Clip tabs area so they don't bleed behind the scroll buttons
+    [NSGraphicsContext saveGraphicsState];
+    NSRect tabClipRect = NSMakeRect(0, 0, clipRight, self.bounds.size.height);
+    [NSBezierPath clipRect:tabClipRect];
+
     // 2. Draw Tabs
     for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
         NotepadTabItem *tab = self.tabs[i];
         NSRect tabRect = [self rectForTabAtIndex:i];
+
+        // Skip drawing if outside visible bounds
+        if (NSMaxX(tabRect) < 0 || tabRect.origin.x > clipRight) {
+            continue;
+        }
+
         BOOL isSelected = (i == self.selectedIndex);
         BOOL isHovered = (i == self.hoveredTabIndex);
 
@@ -358,7 +572,7 @@
         NSRect closeRect = [self closeButtonRectForTabRect:tabRect];
         CGFloat titleMaxWidth = closeRect.origin.x - contentLeft - 4.0;
 
-        // Tab Title Text (Crisp white on active amber tab; high-contrast on inactive tabs)
+        // Tab Title Text
         NSColor *titleColor;
         if (isSelected) {
             titleColor = [NSColor whiteColor];
@@ -411,27 +625,69 @@
 
     // 4. Draw [+] Plus Button (New Tab)
     NSRect plusRect = [self plusButtonRect];
-    if (self.isPlusHovered) {
-        NSBezierPath *plusBg = [NSBezierPath bezierPathWithRoundedRect:plusRect xRadius:4.0 yRadius:4.0];
-        NSColor *hoverFill = dark ?
-            [NSColor colorWithCalibratedWhite:0.25 alpha:0.6] :
-            [NSColor colorWithCalibratedWhite:0.80 alpha:0.7];
-        [hoverFill setFill];
-        [plusBg fill];
+    if (NSMaxX(plusRect) > 0 && plusRect.origin.x <= clipRight) {
+        if (self.isPlusHovered) {
+            NSBezierPath *plusBg = [NSBezierPath bezierPathWithRoundedRect:plusRect xRadius:4.0 yRadius:4.0];
+            NSColor *hoverFill = dark ?
+                [NSColor colorWithCalibratedWhite:0.25 alpha:0.6] :
+                [NSColor colorWithCalibratedWhite:0.80 alpha:0.7];
+            [hoverFill setFill];
+            [plusBg fill];
+        }
+
+        NSDictionary *plusAttrs = @{
+            NSFontAttributeName: [NSFont systemFontOfSize:14.0 weight:NSFontWeightMedium],
+            NSForegroundColorAttributeName: self.isPlusHovered ?
+                (dark ? [NSColor whiteColor] : [NSColor blackColor]) :
+                (dark ? [NSColor colorWithCalibratedWhite:0.65 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.35 alpha:1.0])
+        };
+        NSAttributedString *plusStr = [[NSAttributedString alloc] initWithString:@"+" attributes:plusAttrs];
+        NSSize plusSize = [plusStr size];
+        NSRect plusDrawRect = NSMakeRect(plusRect.origin.x + (plusRect.size.width - plusSize.width) / 2.0,
+                                         plusRect.origin.y + (plusRect.size.height - plusSize.height) / 2.0,
+                                         plusSize.width, plusSize.height);
+        [plusStr drawInRect:plusDrawRect];
     }
 
-    NSDictionary *plusAttrs = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:14.0 weight:NSFontWeightMedium],
-        NSForegroundColorAttributeName: self.isPlusHovered ?
-            (dark ? [NSColor whiteColor] : [NSColor blackColor]) :
-            (dark ? [NSColor colorWithCalibratedWhite:0.65 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.35 alpha:1.0])
-    };
-    NSAttributedString *plusStr = [[NSAttributedString alloc] initWithString:@"+" attributes:plusAttrs];
-    NSSize plusSize = [plusStr size];
-    NSRect plusDrawRect = NSMakeRect(plusRect.origin.x + (plusRect.size.width - plusSize.width) / 2.0,
-                                     plusRect.origin.y + (plusRect.size.height - plusSize.height) / 2.0,
-                                     plusSize.width, plusSize.height);
-    [plusStr drawInRect:plusDrawRect];
+    [NSGraphicsContext restoreGraphicsState];
+
+    // 5. Draw Right Scroll Controls (< and >) if overflow occurs
+    if (hasScroll) {
+        // Gradient fade out
+        CGFloat fadeWidth = 20.0;
+        CGFloat fadeX = clipRight - fadeWidth;
+        NSRect fadeRect = NSMakeRect(fadeX, 0, fadeWidth, self.bounds.size.height);
+
+        NSColor *fadeStart = dark ?
+            [NSColor colorWithCalibratedRed:0.09 green:0.095 blue:0.105 alpha:0.0] :
+            [NSColor colorWithCalibratedWhite:0.91 alpha:0.0];
+        NSColor *fadeEnd = dark ?
+            [NSColor colorWithCalibratedRed:0.09 green:0.095 blue:0.105 alpha:1.0] :
+            [NSColor colorWithCalibratedWhite:0.91 alpha:1.0];
+        NSGradient *fadeGrad = [[NSGradient alloc] initWithStartingColor:fadeStart endingColor:fadeEnd];
+        [fadeGrad drawInRect:fadeRect angle:0];
+
+        // Opaque background behind buttons
+        NSRect buttonsBgRect = NSMakeRect(clipRight, 0, self.bounds.size.width - clipRight, self.bounds.size.height);
+        [fadeEnd setFill];
+        NSRectFill(buttonsBgRect);
+
+        // Draw Left Chevron Button (<)
+        BOOL canScrollLeft = (_scrollOffset > 0.5);
+        [self drawScrollButtonInRect:[self leftScrollButtonRect]
+                             isLeft:YES
+                            enabled:canScrollLeft
+                            hovered:self.isLeftScrollHovered
+                             isDark:dark];
+
+        // Draw Right Chevron Button (>)
+        BOOL canScrollRight = (_scrollOffset < [self maxScrollOffset] - 0.5);
+        [self drawScrollButtonInRect:[self rightScrollButtonRect]
+                             isLeft:NO
+                            enabled:canScrollRight
+                            hovered:self.isRightScrollHovered
+                             isDark:dark];
+    }
 }
 
 @end
