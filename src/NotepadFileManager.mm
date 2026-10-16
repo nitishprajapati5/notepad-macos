@@ -2,6 +2,7 @@
 #import "NotepadWindowController.h"
 #import "AppDelegate.h"
 #import "ScintillaView+Notepad.h"
+#import "PreferencesManager.h"
 #import "Scintilla.h"
 
 @implementation NotepadFileManager
@@ -63,7 +64,16 @@
         content = [[NSString alloc] initWithData:data encoding:detectedEncoding];
     }
 
-    // 2. Try UTF-8 without BOM
+    // 2. Try default encoding first if specified and not UTF-8
+    NSStringEncoding preferredEncoding = [PreferencesManager sharedManager].defaultEncoding;
+    if (preferredEncoding != NSUTF8StringEncoding) {
+        content = [[NSString alloc] initWithData:data encoding:preferredEncoding];
+        if (content) {
+            detectedEncoding = preferredEncoding;
+        }
+    }
+
+    // 3. Try UTF-8 without BOM
     if (!content) {
         content = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
         if (content) {
@@ -71,7 +81,7 @@
         }
     }
 
-    // 3. Fallback to Windows-1252 / ANSI
+    // 4. Fallback to Windows-1252 / ANSI / ISO Latin 1
     if (!content) {
         content = [[NSString alloc] initWithData:data encoding:NSWindowsCP1252StringEncoding];
         if (content) {
@@ -156,6 +166,14 @@
     } else { // SC_EOL_LF
         normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
         normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\r" withString:@"\n"];
+    }
+
+    // Backup on save if enabled in preferences
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    if (prefs.backupOnSave && [[NSFileManager defaultManager] fileExistsAtPath:controller.filePath]) {
+        NSString *bakPath = [controller.filePath stringByAppendingPathExtension:@"bak"];
+        [[NSFileManager defaultManager] removeItemAtPath:bakPath error:nil];
+        [[NSFileManager defaultManager] copyItemAtPath:controller.filePath toPath:bakPath error:nil];
     }
 
     BOOL success = [normalizedContent writeToFile:controller.filePath

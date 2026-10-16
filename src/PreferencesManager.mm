@@ -5,10 +5,14 @@ NSString *const NPPreferencesDidChangeNotification = @"NPPreferencesDidChangeNot
 static NSString *const kNPFontNameKey        = @"NP.fontName";
 static NSString *const kNPFontSizeKey        = @"NP.fontSize";
 static NSString *const kNPTabWidthKey        = @"NP.tabWidth";
+static NSString *const kNPUseSpacesKey       = @"NP.useSpaces";
 static NSString *const kNPWordWrapKey        = @"NP.wordWrap";
 static NSString *const kNPShowLineNumbersKey = @"NP.showLineNumbers";
 static NSString *const kNPShowStatusBarKey   = @"NP.showStatusBar";
 static NSString *const kNPThemeModeKey       = @"NP.themeMode";
+static NSString *const kNPDefaultEncodingKey = @"NP.defaultEncoding";
+static NSString *const kNPBackupOnSaveKey    = @"NP.backupOnSave";
+static NSString *const kNPAutoIndentKey      = @"NP.autoIndent";
 
 @implementation PreferencesManager
 
@@ -19,6 +23,26 @@ static NSString *const kNPThemeModeKey       = @"NP.themeMode";
         instance = [[PreferencesManager alloc] init];
     });
     return instance;
+}
+
++ (NSArray<NSDictionary<NSString *, id> *> *)supportedEncodings {
+    return @[
+        @{@"name": @"UTF-8", @"encoding": @(NSUTF8StringEncoding)},
+        @{@"name": @"UTF-16 LE", @"encoding": @(NSUTF16LittleEndianStringEncoding)},
+        @{@"name": @"UTF-16 BE", @"encoding": @(NSUTF16BigEndianStringEncoding)},
+        @{@"name": @"Western (Windows-1252)", @"encoding": @(NSWindowsCP1252StringEncoding)},
+        @{@"name": @"US-ASCII", @"encoding": @(NSASCIIStringEncoding)},
+        @{@"name": @"Western (ISO Latin 1)", @"encoding": @(NSISOLatin1StringEncoding)}
+    ];
+}
+
++ (NSString *)nameForEncoding:(NSStringEncoding)encoding {
+    for (NSDictionary *item in [self supportedEncodings]) {
+        if ([item[@"encoding"] unsignedIntegerValue] == encoding) {
+            return item[@"name"];
+        }
+    }
+    return [NSString localizedNameOfStringEncoding:encoding] ?: @"Custom";
 }
 
 - (instancetype)init {
@@ -36,20 +60,28 @@ static NSString *const kNPThemeModeKey       = @"NP.themeMode";
         kNPFontNameKey: @"Menlo",
         kNPFontSizeKey: @(12),
         kNPTabWidthKey: @(4),
+        kNPUseSpacesKey: @(NO),
         kNPWordWrapKey: @(NO),
         kNPShowLineNumbersKey: @(NO),
         kNPShowStatusBarKey: @(YES),
-        kNPThemeModeKey: @(NPThemeModeSystem)
+        kNPThemeModeKey: @(NPThemeModeSystem),
+        kNPDefaultEncodingKey: @(NSUTF8StringEncoding),
+        kNPBackupOnSaveKey: @(NO),
+        kNPAutoIndentKey: @(YES)
     };
     [defs registerDefaults:defaults];
 
     _fontName = [defs stringForKey:kNPFontNameKey] ?: @"Menlo";
     _fontSize = [defs integerForKey:kNPFontSizeKey];
     _tabWidth = [defs integerForKey:kNPTabWidthKey];
+    _useSpaces = [defs boolForKey:kNPUseSpacesKey];
     _wordWrap = [defs boolForKey:kNPWordWrapKey];
     _showLineNumbers = [defs boolForKey:kNPShowLineNumbersKey];
     _showStatusBar = [defs boolForKey:kNPShowStatusBarKey];
     _themeMode = (NPThemeMode)[defs integerForKey:kNPThemeModeKey];
+    _defaultEncoding = (NSStringEncoding)[defs integerForKey:kNPDefaultEncodingKey];
+    _backupOnSave = [defs boolForKey:kNPBackupOnSaveKey];
+    _autoIndent = [defs boolForKey:kNPAutoIndentKey];
 }
 
 - (void)savePreferences {
@@ -57,10 +89,14 @@ static NSString *const kNPThemeModeKey       = @"NP.themeMode";
     [defs setObject:_fontName forKey:kNPFontNameKey];
     [defs setInteger:_fontSize forKey:kNPFontSizeKey];
     [defs setInteger:_tabWidth forKey:kNPTabWidthKey];
+    [defs setBool:_useSpaces forKey:kNPUseSpacesKey];
     [defs setBool:_wordWrap forKey:kNPWordWrapKey];
     [defs setBool:_showLineNumbers forKey:kNPShowLineNumbersKey];
     [defs setBool:_showStatusBar forKey:kNPShowStatusBarKey];
     [defs setInteger:_themeMode forKey:kNPThemeModeKey];
+    [defs setInteger:_defaultEncoding forKey:kNPDefaultEncodingKey];
+    [defs setBool:_backupOnSave forKey:kNPBackupOnSaveKey];
+    [defs setBool:_autoIndent forKey:kNPAutoIndentKey];
     [defs synchronize];
 
     [[NSNotificationCenter defaultCenter] postNotificationName:NPPreferencesDidChangeNotification

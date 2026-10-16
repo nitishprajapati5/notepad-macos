@@ -76,7 +76,7 @@
     // Tab & EOL setup (Phase 2 defaults: tab width 4, use tabs, EOL LF)
     NSInteger tabWidth = prefs.tabWidth > 0 ? prefs.tabWidth : 4;
     [self message:SCI_SETTABWIDTH wParam:tabWidth lParam:0];
-    [self message:SCI_SETUSETABS wParam:1 lParam:0]; // Use spaces: false -> use tabs
+    [self message:SCI_SETUSETABS wParam:prefs.useSpaces ? 0 : 1 lParam:0];
     [self message:SCI_SETEOLMODE wParam:SC_EOL_LF lParam:0];
     [self message:SCI_SETVIEWEOL wParam:0 lParam:0];
 
@@ -131,6 +131,14 @@
 
 - (NSInteger)np_tabWidth {
     return [self message:SCI_GETTABWIDTH];
+}
+
+- (void)np_setUseSpaces:(BOOL)useSpaces {
+    [self message:SCI_SETUSETABS wParam:useSpaces ? 0 : 1 lParam:0];
+}
+
+- (BOOL)np_useSpaces {
+    return [self message:SCI_GETUSETABS] == 0;
 }
 
 @end

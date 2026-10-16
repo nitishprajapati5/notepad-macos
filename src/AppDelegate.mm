@@ -4,6 +4,7 @@
 #import "NotepadDocumentController.h"
 #import "ScintillaView+Notepad.h"
 #import "PreferencesManager.h"
+#import "PreferencesWindowController.h"
 
 @implementation AppDelegate
 
@@ -113,7 +114,7 @@
                 keyEquivalent:@""];
     [appMenu addItem:[NSMenuItem separatorItem]];
     [appMenu addItemWithTitle:@"Preferences…"
-                       action:@selector(chooseFont:)
+                       action:@selector(showPreferencesWindow:)
                 keyEquivalent:@","];
     [appMenu addItem:[NSMenuItem separatorItem]];
     [appMenu addItemWithTitle:@"Hide Notepad"
@@ -336,6 +337,10 @@
     PreferencesManager *prefs = [PreferencesManager sharedManager];
     prefs.themeMode = NPThemeModeSystem;
     [prefs savePreferences];
+}
+
+- (IBAction)showPreferencesWindow:(nullable id)sender {
+    [[PreferencesWindowController sharedPreferencesWindowController] showWindow:sender];
 }
 
 @end

@@ -17,6 +17,8 @@ NS_ASSUME_NONNULL_BEGIN
 - (NSInteger)np_fontSize;
 - (void)np_setTabWidth:(NSInteger)tabWidth;
 - (NSInteger)np_tabWidth;
+- (void)np_setUseSpaces:(BOOL)useSpaces;
+- (BOOL)np_useSpaces;
 
 @end
 

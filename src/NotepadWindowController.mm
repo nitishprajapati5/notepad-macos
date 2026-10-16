@@ -33,7 +33,7 @@
     self = [super initWithWindow:win];
     if (self) {
         _filePath = [filePath copy];
-        _encoding = NSUTF8StringEncoding;
+        _encoding = [PreferencesManager sharedManager].defaultEncoding;
         win.delegate = self;
 
         [self setupUIInWindow:win];
@@ -136,6 +136,10 @@
             self.statusBar.hidden = !prefs.showStatusBar;
             [self layoutSubviews];
         }
+        [self.editor np_setWordWrap:prefs.wordWrap];
+        [self.editor np_setLineNumbersVisible:prefs.showLineNumbers];
+        [self.editor np_setTabWidth:prefs.tabWidth];
+        [self.editor np_setUseSpaces:prefs.useSpaces];
         [self applyThemeAndAppearance];
     });
 }
@@ -294,6 +298,22 @@
             if ((notification->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0) {
                 [[FindReplaceController sharedController] editorContentDidChange:self.editor];
                 [self updateEmptyStateVisibility];
+            }
+            break;
+        case SCN_CHARADDED:
+            if ([PreferencesManager sharedManager].autoIndent && (notification->ch == '\n' || notification->ch == '\r')) {
+                sptr_t curPos = [self.editor message:SCI_GETCURRENTPOS];
+                sptr_t curLine = [self.editor message:SCI_LINEFROMPOSITION wParam:curPos];
+                if (curLine > 0) {
+                    sptr_t prevIndentation = [self.editor message:SCI_GETLINEINDENTATION wParam:curLine - 1];
+                    if (prevIndentation > 0) {
+                        [self.editor message:SCI_SETLINEINDENTATION wParam:curLine lParam:prevIndentation];
+                        sptr_t indentPos = [self.editor message:SCI_GETLINEINDENTPOSITION wParam:curLine];
+                        [self.editor message:SCI_SETCURRENTPOS wParam:indentPos];
+                        [self.editor message:SCI_SETSELECTIONSTART wParam:indentPos];
+                        [self.editor message:SCI_SETSELECTIONEND wParam:indentPos];
+                    }
+                }
             }
             break;
         default:
