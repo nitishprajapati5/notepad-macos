@@ -1,24 +1,43 @@
 #import <Cocoa/Cocoa.h>
 #import "ScintillaView.h"
-
 #import "StatusBarView.h"
+#import "NotepadTabBarView.h"
+#import "NotepadTabItem.h"
 
 NS_ASSUME_NONNULL_BEGIN
 
 @class FindReplaceController;
 @class EmptyDocumentOverlayView;
 
-@interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation, StatusBarViewDelegate>
+@interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation, StatusBarViewDelegate, NotepadTabBarViewDelegate>
 
-@property (nonatomic, strong) ScintillaView *editor;
+@property (nonatomic, strong) NSMutableArray<NotepadTabItem *> *tabs;
+@property (nonatomic, assign) NSInteger currentTabIndex;
+@property (nonatomic, readonly, nullable) NotepadTabItem *currentTab;
+
+@property (nonatomic, strong) NotepadTabBarView *tabBarView;
+@property (nonatomic, strong) NSView *editorContainerView;
 @property (nonatomic, strong) StatusBarView *statusBar;
-@property (nonatomic, strong) EmptyDocumentOverlayView *emptyOverlayView;
 @property (nonatomic, strong, nullable) FindReplaceController *findReplaceController;
+
+// Convenience dynamic accessors mapping to the active tab
+@property (nonatomic, readonly, nullable) ScintillaView *editor;
+@property (nonatomic, readonly, nullable) EmptyDocumentOverlayView *emptyOverlayView;
 @property (nonatomic, copy, nullable) NSString *filePath;
 @property (nonatomic, assign) BOOL isDirty;
 @property (nonatomic, assign) NSStringEncoding encoding;
 
 - (instancetype)initWithFilePath:(nullable NSString *)filePath;
+
+// Multi-Tab management (Notepad++ / Windows 11 style)
+- (void)addNewTabWithFilePath:(nullable NSString *)path;
+- (void)closeTabAtIndex:(NSInteger)index;
+- (void)selectTabAtIndex:(NSInteger)index;
+- (IBAction)newTab:(nullable id)sender;
+- (IBAction)closeTab:(nullable id)sender;
+- (IBAction)nextTab:(nullable id)sender;
+- (IBAction)previousTab:(nullable id)sender;
+
 - (void)loadFile:(NSString *)path;
 - (void)updateWindowTitle;
 - (void)updateStatusBar;
@@ -27,7 +46,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)saveFile;
 - (BOOL)saveFileAs;
 
-// Actions matching Windows Notepad
+// Actions matching Windows Notepad & Notepad++
 - (IBAction)newDocument:(nullable id)sender;
 - (IBAction)newWindow:(nullable id)sender;
 - (IBAction)openDocument:(nullable id)sender;
@@ -65,7 +84,6 @@ NS_ASSUME_NONNULL_BEGIN
 - (IBAction)setThemeLight:(nullable id)sender;
 - (IBAction)setThemeDark:(nullable id)sender;
 - (IBAction)setThemeSystem:(nullable id)sender;
-- (void)applyThemeAndAppearance;
 
 @end
 

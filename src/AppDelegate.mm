@@ -68,13 +68,22 @@
 }
 
 - (void)newDocument:(nullable id)sender {
-    NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:nil];
-    [self addWindowController:wc];
-    [wc showWindow:nil];
+    NSWindowController *activeWC = [[NSApp keyWindow] windowController];
+    NotepadWindowController *notepadWC = [activeWC isKindOfClass:[NotepadWindowController class]] ? (NotepadWindowController *)activeWC : [self.windowControllers firstObject];
+    if (notepadWC) {
+        [notepadWC newTab:sender];
+        [notepadWC showWindow:nil];
+    } else {
+        NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:nil];
+        [self addWindowController:wc];
+        [wc showWindow:nil];
+    }
 }
 
 - (void)newWindow:(nullable id)sender {
-    [self newDocument:sender];
+    NotepadWindowController *wc = [[NotepadWindowController alloc] initWithFilePath:nil];
+    [self addWindowController:wc];
+    [wc showWindow:nil];
 }
 
 - (void)openDocument:(nullable id)sender {
@@ -137,6 +146,9 @@
     // 2. File Menu
     NSMenuItem *fileMenuItem = [[NSMenuItem alloc] init];
     NSMenu *fileMenu = [[NSMenu alloc] initWithTitle:@"File"];
+    [fileMenu addItemWithTitle:@"New Tab"
+                        action:@selector(newDocument:)
+                 keyEquivalent:@"t"];
     [fileMenu addItemWithTitle:@"New"
                         action:@selector(newDocument:)
                  keyEquivalent:@"n"];
@@ -177,9 +189,13 @@
                         action:@selector(printDocument:)
                  keyEquivalent:@"p"];
     [fileMenu addItem:[NSMenuItem separatorItem]];
-    [fileMenu addItemWithTitle:@"Close Window"
-                        action:@selector(performClose:)
+    [fileMenu addItemWithTitle:@"Close Tab"
+                        action:@selector(closeTab:)
                  keyEquivalent:@"w"];
+    NSMenuItem *closeWin = [fileMenu addItemWithTitle:@"Close Window"
+                                               action:@selector(performClose:)
+                                        keyEquivalent:@"W"];
+    [closeWin setKeyEquivalentModifierMask:(NSEventModifierFlagShift | NSEventModifierFlagCommand)];
     [fileMenuItem setSubmenu:fileMenu];
     [menubar addItem:fileMenuItem];
 

@@ -96,18 +96,39 @@
         content = @"";
     }
 
-    // Determine target controller: reuse existing if reverting/reloading or untitled & unmodified & empty
+    // Determine target controller: reuse existing window or find active one
     NotepadWindowController *targetWC = controller;
+    if (!targetWC) {
+        NSWindowController *activeWC = [[NSApp keyWindow] windowController];
+        if ([activeWC isKindOfClass:[NotepadWindowController class]]) {
+            targetWC = (NotepadWindowController *)activeWC;
+        } else {
+            AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
+            targetWC = [appDelegate.windowControllers firstObject];
+        }
+    }
+
     BOOL canReuse = NO;
     if (targetWC) {
-        if ([targetWC.filePath isEqualToString:path]) {
+        // If file is already open in a tab, simply switch to that tab
+        for (NSInteger i = 0; i < (NSInteger)targetWC.tabs.count; i++) {
+            if ([targetWC.tabs[i].filePath isEqualToString:path]) {
+                [targetWC selectTabAtIndex:i];
+                return;
+            }
+        }
+
+        // If active tab is empty and unmodified, reuse it
+        if (targetWC.filePath == nil && !targetWC.isDirty && [targetWC.editor np_text].length == 0) {
             canReuse = YES;
-        } else if (targetWC.filePath == nil && !targetWC.isDirty && [targetWC.editor np_text].length == 0) {
+        } else {
+            // Otherwise open a new tab in this same window!
+            [targetWC addNewTabWithFilePath:nil];
             canReuse = YES;
         }
     }
 
-    if (!canReuse) {
+    if (!targetWC) {
         targetWC = [[NotepadWindowController alloc] initWithFilePath:nil];
         AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
         [appDelegate addWindowController:targetWC];
