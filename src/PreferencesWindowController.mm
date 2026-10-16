@@ -57,9 +57,10 @@
 @property (nonatomic, strong) NSButton *backupOnSaveCheckbox;
 @property (nonatomic, strong) NSButton *autoIndentCheckbox;
 
-// Cards list for dynamic color updates
+// Tracked labels & boxes for dynamic Light / Dark mode updates
 @property (nonatomic, strong) NSMutableArray<NSBox *> *cardBoxes;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *cardHeaderLabels;
+@property (nonatomic, strong) NSMutableArray<NSTextField *> *fieldLabels;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *secondaryLabels;
 
 @end
@@ -94,6 +95,7 @@
 
         _cardBoxes = [NSMutableArray array];
         _cardHeaderLabels = [NSMutableArray array];
+        _fieldLabels = [NSMutableArray array];
         _secondaryLabels = [NSMutableArray array];
 
         self.categories = @[
@@ -120,7 +122,7 @@
     [[NSNotificationCenter defaultCenter] removeObserver:self];
 }
 
-#pragma mark - Color Palette (Sleek Deep Black Aesthetics)
+#pragma mark - Color Palette (Flawless High-Contrast Dark & Light Mode)
 
 - (BOOL)isDark {
     return [[PreferencesManager sharedManager] isDarkModeActive];
@@ -128,53 +130,66 @@
 
 - (NSColor *)windowBgColor {
     return [self isDark] ?
-        [NSColor colorWithCalibratedRed:0.07 green:0.07 blue:0.08 alpha:1.0] : // Sleek rich black #121214
-        [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
+        [NSColor colorWithCalibratedRed:0.07 green:0.07 blue:0.08 alpha:1.0] : // Deep rich black #121214
+        [NSColor colorWithCalibratedWhite:0.94 alpha:1.0];                     // Light gray #F0F1F3
 }
 
 - (NSColor *)sidebarBgColor {
     return [self isDark] ?
         [NSColor colorWithCalibratedRed:0.09 green:0.09 blue:0.105 alpha:1.0] : // Deep obsidian #17171B
-        [NSColor colorWithCalibratedWhite:0.91 alpha:1.0];
+        [NSColor colorWithCalibratedWhite:0.89 alpha:1.0];                      // Clean sidebar #E3E5E8
 }
 
 - (NSColor *)cardBgColor {
     return [self isDark] ?
         [NSColor colorWithCalibratedRed:0.115 green:0.115 blue:0.135 alpha:1.0] : // Graphite Card #1D1D22
-        [NSColor whiteColor];
+        [NSColor whiteColor];                                                    // Crisp White #FFFFFF
 }
 
 - (NSColor *)cardBorderColor {
     return [self isDark] ?
-        [NSColor colorWithCalibratedRed:0.20 green:0.20 blue:0.23 alpha:1.0] : // Crisp subtle border #33333B
-        [NSColor colorWithCalibratedWhite:0.84 alpha:1.0];
+        [NSColor colorWithCalibratedRed:0.20 green:0.20 blue:0.23 alpha:1.0] : // Subtle border #33333B
+        [NSColor colorWithCalibratedWhite:0.80 alpha:1.0];                      // Light border #CCCCCC
 }
 
 - (NSColor *)previewBgColor {
     return [self isDark] ?
-        [NSColor colorWithCalibratedRed:0.055 green:0.055 blue:0.065 alpha:1.0] : // Darker code canvas #0E0E10
-        [NSColor colorWithCalibratedWhite:0.98 alpha:1.0];
+        [NSColor colorWithCalibratedRed:0.055 green:0.055 blue:0.065 alpha:1.0] :
+        [NSColor whiteColor];
 }
 
 - (NSColor *)previewTextColor {
     return [self isDark] ?
         [NSColor colorWithCalibratedWhite:0.93 alpha:1.0] :
-        [NSColor colorWithCalibratedWhite:0.05 alpha:1.0];
+        [NSColor blackColor];
 }
 
 - (NSColor *)primaryTextColor {
     return [self isDark] ?
         [NSColor colorWithCalibratedWhite:0.95 alpha:1.0] :
-        [NSColor colorWithCalibratedWhite:0.10 alpha:1.0];
+        [NSColor colorWithCalibratedWhite:0.08 alpha:1.0]; // Deep rich black #141414 for 100% visibility in Light mode
 }
 
 - (NSColor *)secondaryTextColor {
     return [self isDark] ?
         [NSColor colorWithCalibratedWhite:0.62 alpha:1.0] :
-        [NSColor colorWithCalibratedWhite:0.42 alpha:1.0];
+        [NSColor colorWithCalibratedWhite:0.35 alpha:1.0]; // Crisp charcoal #595959 for readable descriptions in Light mode
 }
 
 - (void)applyThemeColors {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+
+    // Enforce proper Cocoa Aqua / DarkAqua appearance on the window itself
+    if (@available(macOS 10.14, *)) {
+        if (prefs.themeMode == NPThemeModeLight) {
+            self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameAqua];
+        } else if (prefs.themeMode == NPThemeModeDark) {
+            self.window.appearance = [NSAppearance appearanceNamed:NSAppearanceNameDarkAqua];
+        } else {
+            self.window.appearance = nil;
+        }
+    }
+
     NSColor *winColor = [self windowBgColor];
     self.window.backgroundColor = winColor;
 
@@ -201,10 +216,22 @@
     for (NSTextField *label in self.cardHeaderLabels) {
         label.textColor = priColor;
     }
+    for (NSTextField *label in self.fieldLabels) {
+        label.textColor = priColor;
+    }
 
     NSColor *secColor = [self secondaryTextColor];
     for (NSTextField *label in self.secondaryLabels) {
         label.textColor = secColor;
+    }
+
+    if (self.previewScrollView) {
+        self.previewScrollView.wantsLayer = YES;
+        self.previewScrollView.layer.backgroundColor = [self previewBgColor].CGColor;
+        self.previewScrollView.layer.borderColor = [self isDark] ?
+            [NSColor colorWithCalibratedWhite:0.25 alpha:1.0].CGColor :
+            [NSColor colorWithCalibratedWhite:0.75 alpha:1.0].CGColor;
+        self.previewScrollView.layer.borderWidth = 1.0;
     }
 
     [self updateFontPreview];
@@ -302,6 +329,15 @@
     return box;
 }
 
+- (NSTextField *)makeFieldLabel:(NSString *)text frame:(NSRect)frame {
+    NSTextField *label = [NSTextField labelWithString:text];
+    label.frame = frame;
+    label.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
+    label.textColor = [self primaryTextColor];
+    [self.fieldLabels addObject:label];
+    return label;
+}
+
 - (NSTextField *)makeDescriptionLabel:(NSString *)text frame:(NSRect)frame {
     NSTextField *label = [NSTextField labelWithString:text];
     label.frame = frame;
@@ -366,10 +402,7 @@
     NSBox *fontCard = [self createCardWithTitle:@"Font Style & Size"
                                           frame:NSMakeRect(24, fontCardY, cardWidth, fontCardHeight)];
 
-    NSTextField *fontLabel = [NSTextField labelWithString:@"Font:"];
-    fontLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
-    fontLabel.textColor = [self primaryTextColor];
-    fontLabel.frame = NSMakeRect(24, 54, 45, 22);
+    NSTextField *fontLabel = [self makeFieldLabel:@"Font:" frame:NSMakeRect(24, 54, 45, 22)];
     [fontCard addSubview:fontLabel];
 
     self.fontFamilyPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(72, 51, 260, 28) pullsDown:NO];
@@ -378,10 +411,7 @@
     self.fontFamilyPopup.action = @selector(fontFamilyChanged:);
     [fontCard addSubview:self.fontFamilyPopup];
 
-    NSTextField *sizeLabel = [NSTextField labelWithString:@"Size:"];
-    sizeLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
-    sizeLabel.textColor = [self primaryTextColor];
-    sizeLabel.frame = NSMakeRect(350, 54, 40, 22);
+    NSTextField *sizeLabel = [self makeFieldLabel:@"Size:" frame:NSMakeRect(350, 54, 40, 22)];
     [fontCard addSubview:sizeLabel];
 
     self.fontSizePopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(394, 51, 92, 28) pullsDown:NO];
@@ -433,10 +463,7 @@
     NSBox *tabCard = [self createCardWithTitle:@"Tab & Indentation"
                                          frame:NSMakeRect(24, tabCardY, cardWidth, tabCardHeight)];
 
-    NSTextField *tabLabel = [NSTextField labelWithString:@"Tab size:"];
-    tabLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
-    tabLabel.textColor = [self primaryTextColor];
-    tabLabel.frame = NSMakeRect(24, 52, 70, 22);
+    NSTextField *tabLabel = [self makeFieldLabel:@"Tab size:" frame:NSMakeRect(24, 52, 70, 22)];
     [tabCard addSubview:tabLabel];
 
     self.tabWidthPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(98, 49, 130, 28) pullsDown:NO];
@@ -471,10 +498,7 @@
     NSBox *themeCard = [self createCardWithTitle:@"Color Theme"
                                            frame:NSMakeRect(24, cardY, cardWidth, cardHeight)];
 
-    NSTextField *themeLabel = [NSTextField labelWithString:@"Mode:"];
-    themeLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
-    themeLabel.textColor = [self primaryTextColor];
-    themeLabel.frame = NSMakeRect(24, 156, 50, 22);
+    NSTextField *themeLabel = [self makeFieldLabel:@"Mode:" frame:NSMakeRect(24, 156, 50, 22)];
     [themeCard addSubview:themeLabel];
 
     self.themeSegmentedControl = [NSSegmentedControl segmentedControlWithLabels:@[@"Light", @"Dark", @"System Default"]
@@ -510,10 +534,7 @@
     NSBox *encCard = [self createCardWithTitle:@"New Document & Default Encoding"
                                          frame:NSMakeRect(24, cardY, cardWidth, cardHeight)];
 
-    NSTextField *encLabel = [NSTextField labelWithString:@"Encoding:"];
-    encLabel.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
-    encLabel.textColor = [self primaryTextColor];
-    encLabel.frame = NSMakeRect(24, 156, 75, 22);
+    NSTextField *encLabel = [self makeFieldLabel:@"Encoding:" frame:NSMakeRect(24, 156, 75, 22)];
     [encCard addSubview:encLabel];
 
     self.encodingPopup = [[NSPopUpButton alloc] initWithFrame:NSMakeRect(105, 153, 310, 28) pullsDown:NO];
@@ -698,6 +719,10 @@
         targetView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
         [self.detailContainer addSubview:targetView];
         [self updateFontPreview];
+    }
+
+    if (self.tableView.selectedRow != index) {
+        [self.tableView selectRowIndexes:[NSIndexSet indexSetWithIndex:index] byExtendingSelection:NO];
     }
 }
 

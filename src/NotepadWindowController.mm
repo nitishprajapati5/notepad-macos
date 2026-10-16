@@ -18,8 +18,7 @@
     NSWindowStyleMask style = NSWindowStyleMaskTitled |
                               NSWindowStyleMaskClosable |
                               NSWindowStyleMaskMiniaturizable |
-                              NSWindowStyleMaskResizable |
-                              NSWindowStyleMaskFullSizeContentView;
+                              NSWindowStyleMaskResizable;
 
     NSWindow *win = [[NSWindow alloc] initWithContentRect:contentRect
                                                 styleMask:style
@@ -31,9 +30,7 @@
         [NSColor colorWithCalibratedRed:0.125 green:0.125 blue:0.125 alpha:1.0] : [NSColor whiteColor];
     [win setFrameAutosaveName:@"NotepadMainWindow"];
 
-    // Hide upper title bar text and disable macOS native window tabbing
-    win.titleVisibility = NSWindowTitleHidden;
-    win.titlebarAppearsTransparent = YES;
+    // Disable macOS native window tabbing so our custom Notepad++ tabs are used
     win.tabbingMode = NSWindowTabbingModeDisallowed;
 
     self = [super initWithWindow:win];
@@ -57,6 +54,7 @@
 
         // Create initial tab
         [self addNewTabWithFilePath:filePath];
+        [self layoutSubviews];
     }
     return self;
 }
@@ -74,25 +72,19 @@
     CGFloat sbHeight = showStatusBar ? 24.0 : 0.0;
     CGFloat tabBarHeight = 36.0;
 
-    // 1. Tab Bar at the top (adjacent to macOS traffic lights)
-    NSRect tabRect = NSMakeRect(0, contentView.bounds.size.height - tabBarHeight, contentView.bounds.size.width, tabBarHeight);
-    _tabBarView = [[NotepadTabBarView alloc] initWithFrame:tabRect];
-    _tabBarView.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
-    _tabBarView.delegate = self;
-    [contentView addSubview:_tabBarView];
-
-    // 2. Editor Container View in the middle
-    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width, contentView.bounds.size.height - sbHeight - tabBarHeight);
-    _editorContainerView = [[NSView alloc] initWithFrame:editorFrame];
-    _editorContainerView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [contentView addSubview:_editorContainerView];
-
-    // 3. Status Bar at the bottom
+    // 1. Status Bar at the bottom
     _statusBar = [[StatusBarView alloc] initWithFrame:NSMakeRect(0, 0, contentView.bounds.size.width, sbHeight)];
     _statusBar.autoresizingMask = NSViewWidthSizable | NSViewMaxYMargin;
     _statusBar.hidden = !showStatusBar;
     _statusBar.delegate = self;
     [contentView addSubview:_statusBar];
+
+    // 2. Tab Bar at the top - placed on top
+    NSRect tabRect = NSMakeRect(0, contentView.bounds.size.height - tabBarHeight, contentView.bounds.size.width, tabBarHeight);
+    _tabBarView = [[NotepadTabBarView alloc] initWithFrame:tabRect];
+    _tabBarView.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
+    _tabBarView.delegate = self;
+    [contentView addSubview:_tabBarView];
 }
 
 - (void)layoutSubviews {
@@ -102,9 +94,25 @@
     CGFloat sbHeight = showStatusBar ? 24.0 : 0.0;
     CGFloat tabBarHeight = 36.0;
 
-    self.tabBarView.frame = NSMakeRect(0, contentView.bounds.size.height - tabBarHeight, contentView.bounds.size.width, tabBarHeight);
-    self.editorContainerView.frame = NSMakeRect(0, sbHeight, contentView.bounds.size.width, contentView.bounds.size.height - sbHeight - tabBarHeight);
-    self.statusBar.frame = NSMakeRect(0, 0, contentView.bounds.size.width, sbHeight);
+    CGFloat totalH = contentView.bounds.size.height;
+    CGFloat totalW = contentView.bounds.size.width;
+
+    self.statusBar.frame = NSMakeRect(0, 0, totalW, sbHeight);
+    self.tabBarView.frame = NSMakeRect(0, totalH - tabBarHeight, totalW, tabBarHeight);
+
+    NSRect editorFrame = NSMakeRect(0, sbHeight, totalW, MAX(0, totalH - sbHeight - tabBarHeight));
+    for (NotepadTabItem *tab in self.tabs) {
+        tab.editor.frame = editorFrame;
+        tab.emptyOverlayView.frame = editorFrame;
+    }
+}
+
+- (void)windowDidResize:(NSNotification *)notification {
+    [self layoutSubviews];
+}
+
+- (void)windowDidEndLiveResize:(NSNotification *)notification {
+    [self layoutSubviews];
 }
 
 #pragma mark - Dynamic Active Tab Accessors
@@ -169,10 +177,23 @@
 
 - (void)addNewTabWithFilePath:(nullable NSString *)path {
     NSInteger count = self.tabs.count + 1;
-    NSString *title = path ? [path lastPathComponent] : (count == 1 ? @"Untitled" : [NSString stringWithFormat:@"Untitled %ld", (long)count]);
+    NSString *title = path ? [path lastPathComponent] : [NSString stringWithFormat:@"new %ld", (long)count];
 
     NotepadTabItem *item = [NotepadTabItem tabWithTitle:title filePath:path];
     item.editor.delegate = self;
+
+    NSView *contentView = self.window.contentView;
+    CGFloat sbHeight = [PreferencesManager sharedManager].showStatusBar ? 24.0 : 0.0;
+    CGFloat tabBarHeight = 36.0;
+    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width, MAX(0, contentView.bounds.size.height - sbHeight - tabBarHeight));
+
+    item.editor.frame = editorFrame;
+    item.editor.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [contentView addSubview:item.editor positioned:NSWindowBelow relativeTo:self.tabBarView];
+
+    item.emptyOverlayView.frame = editorFrame;
+    item.emptyOverlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
+    [contentView addSubview:item.emptyOverlayView positioned:NSWindowAbove relativeTo:item.editor];
 
     [self.tabs addObject:item];
     self.tabBarView.tabs = self.tabs;
@@ -188,23 +209,32 @@
 - (void)selectTabAtIndex:(NSInteger)index {
     if (index < 0 || index >= (NSInteger)self.tabs.count) return;
 
-    // Remove old subviews from container
-    [[self.editorContainerView subviews] makeObjectsPerformSelector:@selector(removeFromSuperview)];
-
     _currentTabIndex = index;
     self.tabBarView.selectedIndex = index;
 
-    NotepadTabItem *tab = self.currentTab;
-    if (tab) {
-        tab.editor.frame = self.editorContainerView.bounds;
-        tab.editor.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-        [self.editorContainerView addSubview:tab.editor];
+    NSView *contentView = self.window.contentView;
+    CGFloat sbHeight = [PreferencesManager sharedManager].showStatusBar ? 24.0 : 0.0;
+    CGFloat tabBarHeight = 36.0;
+    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width, MAX(0, contentView.bounds.size.height - sbHeight - tabBarHeight));
 
-        tab.emptyOverlayView.frame = self.editorContainerView.bounds;
-        tab.emptyOverlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-        [self.editorContainerView addSubview:tab.emptyOverlayView positioned:NSWindowAbove relativeTo:tab.editor];
+    for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
+        NotepadTabItem *tab = self.tabs[i];
+        BOOL isActive = (i == index);
+        tab.editor.hidden = !isActive;
+        if (isActive) {
+            long length = [tab.editor message:SCI_GETLENGTH];
+            tab.emptyOverlayView.hidden = (length > 0);
+            tab.editor.frame = editorFrame;
+            tab.emptyOverlayView.frame = editorFrame;
+        } else {
+            tab.emptyOverlayView.hidden = YES;
+        }
+    }
 
-        [self.window makeFirstResponder:tab.editor];
+    NotepadTabItem *activeTab = self.currentTab;
+    if (activeTab) {
+        NSView *targetFocus = activeTab.editor.content ?: activeTab.editor;
+        [self.window makeFirstResponder:targetFocus];
     }
 
     [self applyThemeAndAppearance];
@@ -236,6 +266,8 @@
         }
     }
 
+    [tab.editor removeFromSuperview];
+    [tab.emptyOverlayView removeFromSuperview];
     [self.tabs removeObjectAtIndex:index];
     self.tabBarView.tabs = self.tabs;
 
@@ -461,14 +493,7 @@
 - (void)updateEmptyStateVisibility {
     if (!self.editor || !self.emptyOverlayView) return;
     long length = [self.editor message:SCI_GETLENGTH];
-    BOOL isEmpty = (length == 0);
-
-    if (isEmpty && self.emptyOverlayView.isHidden) {
-        self.emptyOverlayView.hidden = NO;
-        [self.emptyOverlayView setNeedsDisplay:YES];
-    } else if (!isEmpty && !self.emptyOverlayView.isHidden) {
-        self.emptyOverlayView.hidden = YES;
-    }
+    self.emptyOverlayView.hidden = (length > 0);
 }
 
 - (BOOL)saveFile {

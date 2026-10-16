@@ -14,15 +14,15 @@
     if (filePath) {
         item.title = [filePath lastPathComponent];
     } else {
-        item.title = title.length > 0 ? title : @"Untitled";
+        item.title = title.length > 0 ? title : @"new 1";
     }
 
-    item.editor = [[ScintillaView alloc] initWithFrame:NSZeroRect];
+    item.editor = [[ScintillaView alloc] initWithFrame:NSMakeRect(0, 0, 800, 600)];
     item.editor.autoresizesSubviews = YES;
     item.editor.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
     [item.editor np_applyDefaultTheme];
 
-    item.emptyOverlayView = [[EmptyDocumentOverlayView alloc] initWithFrame:NSZeroRect];
+    item.emptyOverlayView = [[EmptyDocumentOverlayView alloc] initWithFrame:NSMakeRect(0, 0, 800, 600)];
     item.emptyOverlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
     return item;
@@ -31,10 +31,8 @@
 - (void)updateTitleFromPathOrCount:(NSInteger)tabNumber {
     if (self.filePath) {
         self.title = [self.filePath lastPathComponent];
-    } else if (tabNumber > 1) {
-        self.title = [NSString stringWithFormat:@"Untitled %ld", (long)tabNumber];
     } else {
-        self.title = @"Untitled";
+        self.title = [NSString stringWithFormat:@"new %ld", (long)tabNumber];
     }
 }
 

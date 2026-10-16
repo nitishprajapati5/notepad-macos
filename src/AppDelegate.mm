@@ -308,7 +308,19 @@
     [viewMenuItem setSubmenu:viewMenu];
     [menubar addItem:viewMenuItem];
 
-    // 6. Window Menu
+    // 6. Settings Menu (Notepad++ signature menu)
+    NSMenuItem *settingsMenuItem = [[NSMenuItem alloc] init];
+    NSMenu *settingsMenu = [[NSMenu alloc] initWithTitle:@"Settings"];
+    [settingsMenu addItemWithTitle:@"Preferences…"
+                            action:@selector(showPreferencesWindow:)
+                     keyEquivalent:@","];
+    [settingsMenu addItemWithTitle:@"Style Configurator…"
+                            action:@selector(showStyleConfigurator:)
+                     keyEquivalent:@""];
+    [settingsMenuItem setSubmenu:settingsMenu];
+    [menubar addItem:settingsMenuItem];
+
+    // 7. Window Menu
     NSMenuItem *windowMenuItem = [[NSMenuItem alloc] init];
     NSMenu *windowMenu = [[NSMenu alloc] initWithTitle:@"Window"];
     [windowMenu addItemWithTitle:@"Minimize"
@@ -357,6 +369,12 @@
 
 - (IBAction)showPreferencesWindow:(nullable id)sender {
     [[PreferencesWindowController sharedPreferencesWindowController] showWindow:sender];
+}
+
+- (IBAction)showStyleConfigurator:(nullable id)sender {
+    PreferencesWindowController *pwc = [PreferencesWindowController sharedPreferencesWindowController];
+    [pwc showWindow:sender];
+    [pwc showCategoryIndex:1]; // Category 1 is Editor / Font Style Configurator
 }
 
 @end

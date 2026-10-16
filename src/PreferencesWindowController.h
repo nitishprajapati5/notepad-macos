@@ -6,6 +6,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 + (instancetype)sharedPreferencesWindowController;
 - (void)showWindow:(nullable id)sender;
+- (void)showCategoryIndex:(NSInteger)index;
 
 @end
 

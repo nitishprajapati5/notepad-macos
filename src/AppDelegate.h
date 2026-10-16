@@ -19,6 +19,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (void)removeWindowController:(NotepadWindowController *)controller;
 - (IBAction)runPageSpec:(nullable id)sender;
 - (IBAction)showPreferencesWindow:(nullable id)sender;
+- (IBAction)showStyleConfigurator:(nullable id)sender;
 
 @end
 

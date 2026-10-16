@@ -14,8 +14,6 @@
 - (instancetype)initWithFrame:(NSRect)frameRect {
     self = [super initWithFrame:frameRect];
     if (self) {
-        self.wantsLayer = YES;
-        self.layer.backgroundColor = [NSColor clearColor].CGColor;
         [self setupUI];
     }
     return self;

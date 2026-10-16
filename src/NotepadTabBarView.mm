@@ -20,7 +20,6 @@
         _hoveredTabIndex = -1;
         _hoveredCloseIndex = -1;
         _isPlusHovered = NO;
-        self.wantsLayer = YES;
     }
     return self;
 }
@@ -46,20 +45,23 @@
 }
 
 - (CGFloat)leftOffset {
-    return 76.0; // Space for macOS window traffic lights
+    if (self.window && (self.window.styleMask & NSWindowStyleMaskFullSizeContentView)) {
+        return 76.0; // Space for macOS window traffic lights in full-size mode
+    }
+    return 8.0; // Standard left margin when titlebar is separate
 }
 
 - (CGFloat)tabWidth {
     if (self.tabs.count == 0) return 140.0;
     CGFloat available = self.bounds.size.width - [self leftOffset] - 50.0;
-    CGFloat w = (available / self.tabs.count) - 2.0;
-    return MAX(110.0, MIN(180.0, w));
+    CGFloat w = (available / self.tabs.count) - 3.0;
+    return MAX(110.0, MIN(175.0, w));
 }
 
 - (NSRect)rectForTabAtIndex:(NSInteger)index {
     CGFloat tWidth = [self tabWidth];
-    CGFloat x = [self leftOffset] + index * (tWidth + 2.0);
-    return NSMakeRect(x, 2.0, tWidth, self.bounds.size.height - 2.0);
+    CGFloat x = [self leftOffset] + index * (tWidth + 3.0);
+    return NSMakeRect(x, 1.0, tWidth, self.bounds.size.height - 1.0);
 }
 
 - (NSRect)closeButtonRectForTabRect:(NSRect)tabRect {
@@ -71,7 +73,7 @@
 
 - (NSRect)plusButtonRect {
     CGFloat tWidth = [self tabWidth];
-    CGFloat x = [self leftOffset] + self.tabs.count * (tWidth + 2.0) + 4.0;
+    CGFloat x = [self leftOffset] + self.tabs.count * (tWidth + 3.0) + 6.0;
     CGFloat sz = 22.0;
     CGFloat y = (self.bounds.size.height - sz) / 2.0;
     return NSMakeRect(x, y, sz, sz);
@@ -180,6 +182,76 @@
     }
 }
 
+#pragma mark - Drawing Helpers
+
+- (void)drawFloppyDiskInRect:(NSRect)rect isDirty:(BOOL)isDirty isDark:(BOOL)isDark isSelected:(BOOL)isSelected {
+    CGFloat x = rect.origin.x;
+    CGFloat y = rect.origin.y;
+    CGFloat w = rect.size.width;
+    CGFloat h = rect.size.height;
+
+    NSColor *bodyColor;
+    NSColor *accentColor;
+
+    if (isDirty) {
+        // Red when modified / unsaved
+        bodyColor = [NSColor colorWithCalibratedRed:0.96 green:0.28 blue:0.24 alpha:1.0];
+        accentColor = [NSColor colorWithCalibratedRed:0.96 green:0.28 blue:0.24 alpha:1.0];
+    } else if (isSelected) {
+        // Active tab: Crisp white icon matching the screenshot
+        bodyColor = [NSColor colorWithCalibratedWhite:0.96 alpha:0.95];
+        accentColor = [NSColor colorWithCalibratedWhite:0.96 alpha:0.95];
+    } else {
+        // Inactive tabs: Subtle light gray body with electric blue/cyan shutter!
+        bodyColor = isDark ?
+            [NSColor colorWithCalibratedWhite:0.72 alpha:0.9] :
+            [NSColor colorWithCalibratedWhite:0.35 alpha:0.9];
+        accentColor = [NSColor colorWithCalibratedRed:0.26 green:0.78 blue:1.0 alpha:1.0];
+    }
+
+    // Outer floppy body path with notch at top-right
+    NSBezierPath *body = [NSBezierPath bezierPath];
+    CGFloat r = 1.2;
+    CGFloat notch = 3.0;
+
+    [body moveToPoint:NSMakePoint(x + r, y)];
+    [body lineToPoint:NSMakePoint(x + w - r, y)];
+    [body appendBezierPathWithArcWithCenter:NSMakePoint(x + w - r, y + r) radius:r startAngle:270 endAngle:0 clockwise:NO];
+    [body lineToPoint:NSMakePoint(x + w, y + h - notch)];
+    [body lineToPoint:NSMakePoint(x + w - notch, y + h)];
+    [body lineToPoint:NSMakePoint(x + r, y + h)];
+    [body appendBezierPathWithArcWithCenter:NSMakePoint(x + r, y + h - r) radius:r startAngle:90 endAngle:180 clockwise:NO];
+    [body lineToPoint:NSMakePoint(x, y + r)];
+    [body appendBezierPathWithArcWithCenter:NSMakePoint(x + r, y + r) radius:r startAngle:180 endAngle:270 clockwise:NO];
+    [body closePath];
+
+    body.lineWidth = 1.1;
+    [bodyColor setStroke];
+    [body stroke];
+
+    // Metal shutter at top
+    NSRect shutter = NSMakeRect(x + 3.0, y + h - 5.0, w - 6.0, 4.0);
+    NSBezierPath *shutterPath = [NSBezierPath bezierPathWithRect:shutter];
+    [accentColor setStroke];
+    shutterPath.lineWidth = 0.9;
+    [shutterPath stroke];
+
+    // Slot line inside shutter
+    NSBezierPath *slotPath = [NSBezierPath bezierPath];
+    [slotPath moveToPoint:NSMakePoint(x + 5.2, y + h - 4.2)];
+    [slotPath lineToPoint:NSMakePoint(x + 5.2, y + h - 1.8)];
+    slotPath.lineWidth = 0.9;
+    [accentColor setStroke];
+    [slotPath stroke];
+
+    // Label area at bottom
+    NSRect label = NSMakeRect(x + 2.5, y + 2.0, w - 5.0, 4.2);
+    NSBezierPath *labelPath = [NSBezierPath bezierPathWithRoundedRect:label xRadius:0.5 yRadius:0.5];
+    [bodyColor setStroke];
+    labelPath.lineWidth = 0.8;
+    [labelPath stroke];
+}
+
 #pragma mark - Drawing
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -189,15 +261,15 @@
 
     // 1. Tab Bar Background
     NSColor *barBg = dark ?
-        [NSColor colorWithCalibratedRed:0.09 green:0.09 blue:0.10 alpha:1.0] : // #17171A
-        [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
+        [NSColor colorWithCalibratedRed:0.09 green:0.095 blue:0.105 alpha:1.0] :
+        [NSColor colorWithCalibratedWhite:0.91 alpha:1.0];
     [barBg setFill];
     NSRectFill(self.bounds);
 
     // Bottom border separating tabs from editor
     NSColor *bottomBorderColor = dark ?
         [NSColor colorWithCalibratedRed:0.18 green:0.18 blue:0.20 alpha:1.0] :
-        [NSColor colorWithCalibratedWhite:0.80 alpha:1.0];
+        [NSColor colorWithCalibratedWhite:0.78 alpha:1.0];
     [bottomBorderColor setFill];
     NSRectFill(NSMakeRect(0, 0, self.bounds.size.width, 1.0));
 
@@ -228,67 +300,78 @@
         [path closePath];
 
         if (isSelected) {
-            // Selected tab background matches editor canvas
-            NSColor *activeTabColor = dark ?
-                [NSColor colorWithCalibratedRed:0.125 green:0.125 blue:0.125 alpha:1.0] : // #202020
-                [NSColor whiteColor];
-            [activeTabColor setFill];
+            // Iconic Notepad++ Active Tab: Warm amber/orange gradient fill
+            NSColor *topColor, *bottomColor;
+            if (dark) {
+                topColor = [NSColor colorWithCalibratedRed:0.75 green:0.43 blue:0.16 alpha:1.0];
+                bottomColor = [NSColor colorWithCalibratedRed:0.52 green:0.28 blue:0.10 alpha:1.0];
+            } else {
+                topColor = [NSColor colorWithCalibratedRed:0.88 green:0.54 blue:0.22 alpha:1.0];
+                bottomColor = [NSColor colorWithCalibratedRed:0.70 green:0.40 blue:0.14 alpha:1.0];
+            }
+
+            NSGradient *amberGrad = [[NSGradient alloc] initWithStartingColor:topColor endingColor:bottomColor];
+            [amberGrad drawInBezierPath:path angle:270];
+
+            // Top highlight border
+            NSColor *amberBorder = dark ?
+                [NSColor colorWithCalibratedRed:0.86 green:0.54 blue:0.22 alpha:0.8] :
+                [NSColor colorWithCalibratedRed:0.95 green:0.62 blue:0.28 alpha:0.9];
+            [amberBorder setStroke];
+            path.lineWidth = 1.0;
+            [path stroke];
+        } else {
+            // Inactive Tab Background
+            NSColor *inactiveBg;
+            if (dark) {
+                inactiveBg = isHovered ?
+                    [NSColor colorWithCalibratedRed:0.18 green:0.19 blue:0.22 alpha:1.0] :
+                    [NSColor colorWithCalibratedRed:0.13 green:0.135 blue:0.155 alpha:1.0];
+            } else {
+                inactiveBg = isHovered ?
+                    [NSColor colorWithCalibratedWhite:0.95 alpha:1.0] :
+                    [NSColor colorWithCalibratedWhite:0.86 alpha:1.0];
+            }
+            [inactiveBg setFill];
             [path fill];
 
-            // Top active accent line (Windows 11 Notepad / Notepad++ blue accent)
-            NSRect accentRect = NSMakeRect(tabRect.origin.x + 4.0, NSMaxY(tabRect) - 2.0, tabRect.size.width - 8.0, 2.0);
-            [[NSColor colorWithCalibratedRed:0.04 green:0.52 blue:1.0 alpha:1.0] setFill];
-            NSRectFill(accentRect);
-        } else {
-            if (isHovered) {
-                NSColor *hoverColor = dark ?
-                    [NSColor colorWithCalibratedWhite:0.16 alpha:1.0] :
-                    [NSColor colorWithCalibratedWhite:0.86 alpha:1.0];
-                [hoverColor setFill];
-                [path fill];
-            }
-            // Vertical divider between unselected tabs
-            if (i < (NSInteger)self.tabs.count - 1 && i + 1 != self.selectedIndex) {
-                NSColor *divColor = dark ?
-                    [NSColor colorWithCalibratedWhite:0.22 alpha:1.0] :
-                    [NSColor colorWithCalibratedWhite:0.78 alpha:1.0];
-                [divColor setFill];
-                NSRectFill(NSMakeRect(NSMaxX(tabRect), 8.0, 1.0, tabRect.size.height - 14.0));
-            }
+            // Inactive Tab Border
+            NSColor *inactiveBorder = dark ?
+                [NSColor colorWithCalibratedRed:0.22 green:0.23 blue:0.26 alpha:1.0] :
+                [NSColor colorWithCalibratedWhite:0.76 alpha:1.0];
+            [inactiveBorder setStroke];
+            path.lineWidth = 1.0;
+            [path stroke];
         }
 
-        // Draw Tab Content
-        CGFloat contentLeft = tabRect.origin.x + 10.0;
+        // 3. Tab Content
+        CGFloat contentLeft = tabRect.origin.x + 8.0;
+
+        // Draw Floppy Disk Icon 💾
+        CGFloat diskSize = 14.0;
+        CGFloat diskY = tabRect.origin.y + (tabRect.size.height - diskSize) / 2.0;
+        NSRect diskRect = NSMakeRect(contentLeft, diskY, diskSize, diskSize);
+        [self drawFloppyDiskInRect:diskRect isDirty:tab.isDirty isDark:dark isSelected:isSelected];
+        contentLeft += diskSize + 7.0;
+
+        // Close Button (✕) Rect
         NSRect closeRect = [self closeButtonRectForTabRect:tabRect];
-        CGFloat titleMaxWidth = closeRect.origin.x - contentLeft - 6.0;
+        CGFloat titleMaxWidth = closeRect.origin.x - contentLeft - 4.0;
 
-        // Dirty Dot Indicator (●)
-        if (tab.isDirty) {
-            CGFloat dotSize = 6.0;
-            CGFloat dotY = tabRect.origin.y + (tabRect.size.height - dotSize) / 2.0;
-            NSRect dotRect = NSMakeRect(contentLeft, dotY, dotSize, dotSize);
-            NSBezierPath *dotPath = [NSBezierPath bezierPathWithOvalInRect:dotRect];
-            NSColor *dotColor = dark ?
-                [NSColor colorWithCalibratedRed:1.0 green:0.65 blue:0.2 alpha:1.0] :
-                [NSColor colorWithCalibratedRed:0.9 green:0.4 blue:0.0 alpha:1.0];
-            [dotColor setFill];
-            [dotPath fill];
-            contentLeft += dotSize + 6.0;
-            titleMaxWidth -= (dotSize + 6.0);
-        }
-
-        // Tab Title Text
+        // Tab Title Text (Crisp white on active amber tab; high-contrast on inactive tabs)
         NSColor *titleColor;
         if (isSelected) {
-            titleColor = dark ? [NSColor colorWithCalibratedWhite:0.95 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.10 alpha:1.0];
+            titleColor = [NSColor whiteColor];
         } else {
-            titleColor = dark ? [NSColor colorWithCalibratedWhite:0.65 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.35 alpha:1.0];
+            titleColor = dark ?
+                (isHovered ? [NSColor colorWithCalibratedWhite:0.95 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.72 alpha:1.0]) :
+                (isHovered ? [NSColor colorWithCalibratedWhite:0.05 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.22 alpha:1.0]);
         }
 
         NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
         style.lineBreakMode = NSLineBreakByTruncatingTail;
         NSDictionary *attrs = @{
-            NSFontAttributeName: [NSFont systemFontOfSize:12.0 weight:isSelected ? NSFontWeightMedium : NSFontWeightRegular],
+            NSFontAttributeName: [NSFont systemFontOfSize:12.5 weight:isSelected ? NSFontWeightSemibold : NSFontWeightRegular],
             NSForegroundColorAttributeName: titleColor,
             NSParagraphStyleAttributeName: style
         };
@@ -304,16 +387,18 @@
         if (isSelected || isHovered) {
             if (isCloseHover) {
                 NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:closeRect];
-                NSColor *circleBg = dark ? [NSColor colorWithCalibratedWhite:0.30 alpha:0.5] : [NSColor colorWithCalibratedWhite:0.75 alpha:0.6];
+                NSColor *circleBg = isSelected ?
+                    [NSColor colorWithCalibratedWhite:0.0 alpha:0.25] :
+                    (dark ? [NSColor colorWithCalibratedWhite:0.35 alpha:0.5] : [NSColor colorWithCalibratedWhite:0.75 alpha:0.6]);
                 [circleBg setFill];
                 [circle fill];
             }
 
             NSDictionary *xAttrs = @{
                 NSFontAttributeName: [NSFont systemFontOfSize:10.5 weight:NSFontWeightBold],
-                NSForegroundColorAttributeName: isCloseHover ?
-                    (dark ? [NSColor whiteColor] : [NSColor blackColor]) :
-                    (dark ? [NSColor colorWithCalibratedWhite:0.7 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.4 alpha:1.0])
+                NSForegroundColorAttributeName: isSelected ?
+                    [NSColor whiteColor] :
+                    (dark ? [NSColor colorWithCalibratedWhite:0.75 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.35 alpha:1.0])
             };
             NSAttributedString *xStr = [[NSAttributedString alloc] initWithString:@"✕" attributes:xAttrs];
             NSSize xSize = [xStr size];
@@ -324,11 +409,13 @@
         }
     }
 
-    // 3. Draw [+] Plus Button (New Tab)
+    // 4. Draw [+] Plus Button (New Tab)
     NSRect plusRect = [self plusButtonRect];
     if (self.isPlusHovered) {
         NSBezierPath *plusBg = [NSBezierPath bezierPathWithRoundedRect:plusRect xRadius:4.0 yRadius:4.0];
-        NSColor *hoverFill = dark ? [NSColor colorWithCalibratedWhite:0.25 alpha:0.6] : [NSColor colorWithCalibratedWhite:0.80 alpha:0.7];
+        NSColor *hoverFill = dark ?
+            [NSColor colorWithCalibratedWhite:0.25 alpha:0.6] :
+            [NSColor colorWithCalibratedWhite:0.80 alpha:0.7];
         [hoverFill setFill];
         [plusBg fill];
     }
