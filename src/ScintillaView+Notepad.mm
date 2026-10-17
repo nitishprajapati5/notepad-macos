@@ -37,9 +37,9 @@
     // Scintilla BGR/RGB integer format:
     // Light Mode: Pure White background (0xFFFFFF), Black text (0x000000)
     // Dark Mode: Dark gray background (0x202020), Soft white text (0xDCDCDC)
-    sptr_t backColor   = isDark ? 0x202020 : 0xFFFFFF;
-    sptr_t foreColor   = isDark ? 0xDCDCDC : 0x000000;
-    sptr_t caretColor  = isDark ? 0xFFFFFF : 0x000000;
+    sptr_t backColor = isDark ? 0x202020 : 0xFFFFFF;
+    sptr_t foreColor = isDark ? 0xDCDCDC : 0x000000;
+    sptr_t caretColor = isDark ? 0xFFFFFF : 0x000000;
     sptr_t lineNumFore = isDark ? 0x858585 : 0x707070;
     sptr_t lineNumBack = isDark ? 0x252526 : 0xF5F5F5;
 

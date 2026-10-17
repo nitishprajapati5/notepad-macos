@@ -3,7 +3,10 @@
 
 @implementation NotepadDocumentController
 
-- (void)openDocumentWithContentsOfURL:(NSURL *)url display:(BOOL)display completionHandler:(void (^)(NSDocument * _Nullable document, BOOL documentWasAlreadyOpen, NSError * _Nullable error))completionHandler {
+- (void)openDocumentWithContentsOfURL:(NSURL *)url
+                              display:(BOOL)display
+                    completionHandler:(void (^)(NSDocument *_Nullable document, BOOL documentWasAlreadyOpen,
+                                                NSError *_Nullable error))completionHandler {
     if (url.path) {
         AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
         [appDelegate openFileAtPath:url.path];

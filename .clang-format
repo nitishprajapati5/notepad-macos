@@ -1,0 +1,59 @@
+# ==============================================================================
+# Notepad for macOS — ClangFormat Configuration
+# Modern, clean Objective-C / Objective-C++ / C++ formatting (4-space indent)
+# ==============================================================================
+BasedOnStyle: LLVM
+
+# Indentation & Sizing
+IndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 120
+ContinuationIndentWidth: 4
+AccessModifierOffset: -4
+
+# Objective-C Formatting
+ObjCBlockIndentWidth: 4
+ObjCSpaceAfterProperty: true
+ObjCSpaceBeforeProtocolList: true
+ObjCBinPackProtocolList: Auto
+ObjCBreakBeforeNestedBlockParam: true
+
+# Pointer & Reference Alignment (e.g. NSString *name, ScintillaView &view)
+PointerAlignment: Right
+DerivePointerAlignment: false
+
+# Braces & Functions
+BreakBeforeBraces: Attach
+AllowShortBlocksOnASingleLine: Empty
+AllowShortFunctionsOnASingleLine: Inline
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+
+# Alignment
+AlignAfterOpenBracket: Align
+AlignOperands: Align
+AlignTrailingComments: true
+SpacesBeforeTrailingComments: 2
+
+# Spaces
+SpaceBeforeParens: ControlStatements
+SpaceBeforeAssignmentOperators: true
+SpaceAfterCStyleCast: false
+SpaceInEmptyBlock: false
+SpaceInEmptyParentheses: false
+SpacesInAngles: false
+SpacesInContainerLiterals: false
+SpacesInCStyleCastParentheses: false
+SpacesInParentheses: false
+SpacesInSquareBrackets: false
+
+# Line Breaks & Operators
+BreakBeforeTernaryOperators: true
+BreakConstructorInitializers: BeforeColon
+BreakInheritanceList: BeforeColon
+
+# Includes (Preserve header import ordering for Scintilla/Cocoa headers)
+SortIncludes: Never
+IncludeBlocks: Preserve

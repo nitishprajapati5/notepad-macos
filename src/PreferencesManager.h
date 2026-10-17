@@ -4,11 +4,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 extern NSString *const NPPreferencesDidChangeNotification;
 
-typedef NS_ENUM(NSInteger, NPThemeMode) {
-    NPThemeModeLight = 0,
-    NPThemeModeDark = 1,
-    NPThemeModeSystem = 2
-};
+typedef NS_ENUM(NSInteger, NPThemeMode) { NPThemeModeLight = 0, NPThemeModeDark = 1, NPThemeModeSystem = 2 };
 
 @interface PreferencesManager : NSObject
 
@@ -23,10 +19,20 @@ typedef NS_ENUM(NSInteger, NPThemeMode) {
 @property (nonatomic, assign) NSStringEncoding defaultEncoding;
 @property (nonatomic, assign) BOOL backupOnSave;
 @property (nonatomic, assign) BOOL autoIndent;
+@property (nonatomic, copy) NSString *activeTabColorHex;
+@property (nonatomic, assign) BOOL useRandomTabColors;
 
 + (instancetype)sharedManager;
 + (NSArray<NSDictionary<NSString *, id> *> *)supportedEncodings;
 + (NSString *)nameForEncoding:(NSStringEncoding)encoding;
++ (NSArray<NSDictionary<NSString *, NSString *> *> *)presetTabColors;
++ (NSColor *)colorFromHexString:(NSString *)hexString;
++ (NSString *)hexStringFromColor:(NSColor *)color;
++ (NSColor *)randomVibrantColor;
+
+- (NSColor *)activeTabColor;
+- (void)setActiveTabColor:(NSColor *)color;
+- (void)pickRandomTabColor;
 - (BOOL)isDarkModeActive;
 - (void)savePreferences;
 - (void)loadPreferences;

@@ -17,7 +17,8 @@
         self.textAlignment = alignment;
         self.monospaced = monospaced;
         self.translatesAutoresizingMaskIntoConstraints = NO;
-        [self setContentHuggingPriority:NSLayoutPriorityDefaultLow forOrientation:NSLayoutConstraintOrientationHorizontal];
+        [self setContentHuggingPriority:NSLayoutPriorityDefaultLow
+                         forOrientation:NSLayoutConstraintOrientationHorizontal];
     }
     return self;
 }
@@ -54,9 +55,8 @@
         [path fill];
     }
 
-    NSFont *font = _monospaced ?
-        [NSFont monospacedDigitSystemFontOfSize:11.0 weight:NSFontWeightRegular] :
-        [NSFont systemFontOfSize:11.0 weight:NSFontWeightRegular];
+    NSFont *font = _monospaced ? [NSFont monospacedDigitSystemFontOfSize:11.0 weight:NSFontWeightRegular]
+                               : [NSFont systemFontOfSize:11.0 weight:NSFontWeightRegular];
 
     NSColor *textColor = _isHovered ? [NSColor controlTextColor] : [NSColor secondaryLabelColor];
 
@@ -64,11 +64,8 @@
     style.alignment = _textAlignment;
     style.lineBreakMode = NSLineBreakByTruncatingTail;
 
-    NSDictionary *attrs = @{
-        NSFontAttributeName: font,
-        NSForegroundColorAttributeName: textColor,
-        NSParagraphStyleAttributeName: style
-    };
+    NSDictionary *attrs =
+        @{NSFontAttributeName: font, NSForegroundColorAttributeName: textColor, NSParagraphStyleAttributeName: style};
 
     NSAttributedString *attrTitle = [[NSAttributedString alloc] initWithString:self.title attributes:attrs];
     NSSize textSize = [attrTitle size];
@@ -112,12 +109,16 @@
 }
 
 - (void)setupUI {
-    _posButton = [[StatusBarSegmentButton alloc] initWithTitle:_cursorPositionText alignment:NSTextAlignmentLeft monospaced:YES];
+    _posButton = [[StatusBarSegmentButton alloc] initWithTitle:_cursorPositionText
+                                                     alignment:NSTextAlignmentLeft
+                                                    monospaced:YES];
     _posButton.target = self;
     _posButton.action = @selector(posClicked:);
     _posButton.toolTip = @"Line and column number. Click to Go to Line (⌘L)";
 
-    _zoomButton = [[StatusBarSegmentButton alloc] initWithTitle:_zoomText alignment:NSTextAlignmentCenter monospaced:YES];
+    _zoomButton = [[StatusBarSegmentButton alloc] initWithTitle:_zoomText
+                                                      alignment:NSTextAlignmentCenter
+                                                     monospaced:YES];
     _zoomButton.target = self;
     _zoomButton.action = @selector(zoomClicked:);
     _zoomButton.toolTip = @"Current zoom level. Click to adjust zoom";
@@ -127,7 +128,9 @@
     _eolButton.action = @selector(eolClicked:);
     _eolButton.toolTip = @"Line ending format. Click to convert line endings";
 
-    _encButton = [[StatusBarSegmentButton alloc] initWithTitle:_encodingText alignment:NSTextAlignmentCenter monospaced:NO];
+    _encButton = [[StatusBarSegmentButton alloc] initWithTitle:_encodingText
+                                                     alignment:NSTextAlignmentCenter
+                                                    monospaced:NO];
     _encButton.target = self;
     _encButton.action = @selector(encClicked:);
     _encButton.toolTip = @"Character encoding. Click to change encoding";
@@ -229,7 +232,9 @@
     NSMenuItem *itemOut = [menu addItemWithTitle:@"Zoom Out (⌘-)" action:@selector(zoomOutAction:) keyEquivalent:@""];
     itemOut.target = self;
     [menu addItem:[NSMenuItem separatorItem]];
-    NSMenuItem *itemReset = [menu addItemWithTitle:@"Reset to 100% (⌘0)" action:@selector(zoomResetAction:) keyEquivalent:@""];
+    NSMenuItem *itemReset = [menu addItemWithTitle:@"Reset to 100% (⌘0)"
+                                            action:@selector(zoomResetAction:)
+                                     keyEquivalent:@""];
     itemReset.target = self;
 
     NSPoint location = NSMakePoint(0, _zoomButton.bounds.size.height + 2.0);
@@ -263,8 +268,7 @@
 - (void)eolClicked:(id)sender {
     NSMenu *menu = [[NSMenu alloc] initWithTitle:@"Line Endings"];
     NSArray *modes = @[
-        @{@"title": @"Windows (CRLF)", @"tag": @(0)},
-        @{@"title": @"Macintosh (CR)", @"tag": @(1)},
+        @{@"title": @"Windows (CRLF)", @"tag": @(0)}, @{@"title": @"Macintosh (CR)", @"tag": @(1)},
         @{@"title": @"Unix (LF)", @"tag": @(2)}
     ];
     for (NSDictionary *m in modes) {
@@ -324,17 +328,20 @@
     _posButton.title = _cursorPositionText;
 }
 
-- (void)updateLine:(NSInteger)line column:(NSInteger)column selectedChars:(NSInteger)selectedChars selectedLines:(NSInteger)selectedLines {
+- (void)updateLine:(NSInteger)line
+            column:(NSInteger)column
+     selectedChars:(NSInteger)selectedChars
+     selectedLines:(NSInteger)selectedLines {
     if (selectedChars <= 0) {
         [self updateLine:line column:column];
         return;
     }
     if (selectedLines > 1) {
-        _cursorPositionText = [NSString stringWithFormat:@"Ln %ld, Col %ld (%ld lines, %ld chars selected)",
-                               (long)line, (long)column, (long)selectedLines, (long)selectedChars];
+        _cursorPositionText = [NSString stringWithFormat:@"Ln %ld, Col %ld (%ld lines, %ld chars selected)", (long)line,
+                                                         (long)column, (long)selectedLines, (long)selectedChars];
     } else {
-        _cursorPositionText = [NSString stringWithFormat:@"Ln %ld, Col %ld (%ld selected)",
-                               (long)line, (long)column, (long)selectedChars];
+        _cursorPositionText = [NSString
+            stringWithFormat:@"Ln %ld, Col %ld (%ld selected)", (long)line, (long)column, (long)selectedChars];
     }
     _posButton.title = _cursorPositionText;
 }

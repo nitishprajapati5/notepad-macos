@@ -9,7 +9,9 @@ NS_ASSUME_NONNULL_BEGIN
 @class FindReplaceController;
 @class EmptyDocumentOverlayView;
 
-@interface NotepadWindowController : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation, StatusBarViewDelegate, NotepadTabBarViewDelegate>
+@interface NotepadWindowController
+    : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation, StatusBarViewDelegate,
+                          NotepadTabBarViewDelegate>
 
 @property (nonatomic, strong) NSMutableArray<NotepadTabItem *> *tabs;
 @property (nonatomic, assign) NSInteger currentTabIndex;

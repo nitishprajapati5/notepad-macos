@@ -25,7 +25,10 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, copy) NSString *encodingText;
 
 - (void)updateLine:(NSInteger)line column:(NSInteger)column;
-- (void)updateLine:(NSInteger)line column:(NSInteger)column selectedChars:(NSInteger)selectedChars selectedLines:(NSInteger)selectedLines;
+- (void)updateLine:(NSInteger)line
+            column:(NSInteger)column
+     selectedChars:(NSInteger)selectedChars
+     selectedLines:(NSInteger)selectedLines;
 - (void)updateZoom:(NSInteger)zoomPercent;
 - (void)setEolModeName:(NSString *)eolMode;
 - (void)setEncodingName:(NSString *)name;

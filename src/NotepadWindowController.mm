@@ -16,9 +16,7 @@
 
 - (instancetype)initWithFilePath:(nullable NSString *)filePath {
     NSRect contentRect = NSMakeRect(120, 120, 840, 580);
-    NSWindowStyleMask style = NSWindowStyleMaskTitled |
-                              NSWindowStyleMaskClosable |
-                              NSWindowStyleMaskMiniaturizable |
+    NSWindowStyleMask style = NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskMiniaturizable |
                               NSWindowStyleMaskResizable;
 
     NSWindow *win = [[NSWindow alloc] initWithContentRect:contentRect
@@ -27,8 +25,9 @@
                                                     defer:NO];
     [win center];
     win.minSize = NSMakeSize(480, 240);
-    win.backgroundColor = [[PreferencesManager sharedManager] isDarkModeActive] ?
-        [NSColor colorWithCalibratedRed:0.125 green:0.125 blue:0.125 alpha:1.0] : [NSColor whiteColor];
+    win.backgroundColor = [[PreferencesManager sharedManager] isDarkModeActive]
+                              ? [NSColor colorWithCalibratedRed:0.125 green:0.125 blue:0.125 alpha:1.0]
+                              : [NSColor whiteColor];
     [win setFrameAutosaveName:@"NotepadMainWindow"];
 
     // Disable macOS native window tabbing so our custom Notepad++ tabs are used
@@ -71,7 +70,7 @@
 
     BOOL showStatusBar = [PreferencesManager sharedManager].showStatusBar;
     CGFloat sbHeight = showStatusBar ? 24.0 : 0.0;
-    CGFloat tabBarHeight = 36.0;
+    CGFloat tabBarHeight = kNotepadTabBarHeight;
 
     // 1. Status Bar at the bottom
     _statusBar = [[StatusBarView alloc] initWithFrame:NSMakeRect(0, 0, contentView.bounds.size.width, sbHeight)];
@@ -81,7 +80,8 @@
     [contentView addSubview:_statusBar];
 
     // 2. Tab Bar at the top - placed on top
-    NSRect tabRect = NSMakeRect(0, contentView.bounds.size.height - tabBarHeight, contentView.bounds.size.width, tabBarHeight);
+    NSRect tabRect =
+        NSMakeRect(0, contentView.bounds.size.height - tabBarHeight, contentView.bounds.size.width, tabBarHeight);
     _tabBarView = [[NotepadTabBarView alloc] initWithFrame:tabRect];
     _tabBarView.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
     _tabBarView.delegate = self;
@@ -89,11 +89,12 @@
 }
 
 - (void)layoutSubviews {
-    if (!self.window || !self.window.contentView) return;
+    if (!self.window || !self.window.contentView)
+        return;
     NSView *contentView = self.window.contentView;
     BOOL showStatusBar = [PreferencesManager sharedManager].showStatusBar;
     CGFloat sbHeight = showStatusBar ? 24.0 : 0.0;
-    CGFloat tabBarHeight = 36.0;
+    CGFloat tabBarHeight = kNotepadTabBarHeight;
 
     CGFloat totalH = contentView.bounds.size.height;
     CGFloat totalW = contentView.bounds.size.width;
@@ -185,8 +186,9 @@
 
     NSView *contentView = self.window.contentView;
     CGFloat sbHeight = [PreferencesManager sharedManager].showStatusBar ? 24.0 : 0.0;
-    CGFloat tabBarHeight = 36.0;
-    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width, MAX(0, contentView.bounds.size.height - sbHeight - tabBarHeight));
+    CGFloat tabBarHeight = kNotepadTabBarHeight;
+    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width,
+                                    MAX(0, contentView.bounds.size.height - sbHeight - tabBarHeight));
 
     item.editor.frame = editorFrame;
     item.editor.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
@@ -208,15 +210,17 @@
 }
 
 - (void)selectTabAtIndex:(NSInteger)index {
-    if (index < 0 || index >= (NSInteger)self.tabs.count) return;
+    if (index < 0 || index >= (NSInteger)self.tabs.count)
+        return;
 
     _currentTabIndex = index;
     self.tabBarView.selectedIndex = index;
 
     NSView *contentView = self.window.contentView;
     CGFloat sbHeight = [PreferencesManager sharedManager].showStatusBar ? 24.0 : 0.0;
-    CGFloat tabBarHeight = 36.0;
-    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width, MAX(0, contentView.bounds.size.height - sbHeight - tabBarHeight));
+    CGFloat tabBarHeight = kNotepadTabBarHeight;
+    NSRect editorFrame = NSMakeRect(0, sbHeight, contentView.bounds.size.width,
+                                    MAX(0, contentView.bounds.size.height - sbHeight - tabBarHeight));
 
     for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
         NotepadTabItem *tab = self.tabs[i];
@@ -246,7 +250,8 @@
 }
 
 - (void)closeTabAtIndex:(NSInteger)index {
-    if (index < 0 || index >= (NSInteger)self.tabs.count) return;
+    if (index < 0 || index >= (NSInteger)self.tabs.count)
+        return;
 
     NotepadTabItem *tab = self.tabs[index];
     if (tab.isDirty) {
@@ -261,9 +266,10 @@
 
         NSModalResponse res = [alert runModal];
         if (res == NSAlertFirstButtonReturn) {
-            if (![self saveFile]) return;
+            if (![self saveFile])
+                return;
         } else if (res == NSAlertThirdButtonReturn) {
-            return; // Cancel
+            return;  // Cancel
         }
     }
 
@@ -290,13 +296,15 @@
 }
 
 - (IBAction)nextTab:(nullable id)sender {
-    if (self.tabs.count <= 1) return;
+    if (self.tabs.count <= 1)
+        return;
     NSInteger next = (self.currentTabIndex + 1) % self.tabs.count;
     [self selectTabAtIndex:next];
 }
 
 - (IBAction)previousTab:(nullable id)sender {
-    if (self.tabs.count <= 1) return;
+    if (self.tabs.count <= 1)
+        return;
     NSInteger prev = (self.currentTabIndex - 1 + self.tabs.count) % self.tabs.count;
     [self selectTabAtIndex:prev];
 }
@@ -331,8 +339,8 @@
         }
     }
 
-    self.window.backgroundColor = isDark ?
-        [NSColor colorWithCalibratedRed:0.125 green:0.125 blue:0.125 alpha:1.0] : [NSColor whiteColor];
+    self.window.backgroundColor =
+        isDark ? [NSColor colorWithCalibratedRed:0.125 green:0.125 blue:0.125 alpha:1.0] : [NSColor whiteColor];
 
     [self.tabBarView updateTheme];
 
@@ -355,9 +363,7 @@
 }
 
 - (void)handleAppearanceChanged:(NSNotification *)notification {
-    dispatch_async(dispatch_get_main_queue(), ^{
-        [self applyThemeAndAppearance];
-    });
+    dispatch_async(dispatch_get_main_queue(), ^{ [self applyThemeAndAppearance]; });
 }
 
 - (void)handlePreferencesChanged:(NSNotification *)notification {
@@ -378,13 +384,17 @@
         // Synchronize active encoding with Settings Panel defaultEncoding
         self.encoding = prefs.defaultEncoding;
 
+        [self.tabBarView reloadTabs];
+        [self.tabBarView setNeedsDisplay:YES];
+
         [self applyThemeAndAppearance];
         [self updateStatusBar];
     });
 }
 
 - (void)updateWindowTitle {
-    NSString *fileName = self.filePath ? [self.filePath lastPathComponent] : (self.currentTab ? self.currentTab.title : @"Untitled");
+    NSString *fileName =
+        self.filePath ? [self.filePath lastPathComponent] : (self.currentTab ? self.currentTab.title : @"Untitled");
     NSString *title = [NSString stringWithFormat:@"%@%@ - Notepad", self.isDirty ? @"*" : @"", fileName];
     [self.window setTitle:title];
     [self.window setDocumentEdited:self.isDirty];
@@ -397,7 +407,8 @@
 }
 
 - (void)updateStatusBar {
-    if (!self.editor || !self.statusBar || self.statusBar.isHidden) return;
+    if (!self.editor || !self.statusBar || self.statusBar.isHidden)
+        return;
 
     // 1. Cursor Position & Selection
     sptr_t pos = [self.editor message:SCI_GETCURRENTPOS];
@@ -470,7 +481,8 @@
 }
 
 - (void)statusBar:(StatusBarView *)statusBar didSelectEolMode:(NSInteger)eolMode {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
     [self.editor message:SCI_SETEOLMODE wParam:eolMode lParam:0];
     [self.editor message:SCI_CONVERTEOLS wParam:eolMode lParam:0];
     [self updateStatusBar];
@@ -478,7 +490,8 @@
 }
 
 - (void)statusBar:(StatusBarView *)statusBar didSelectEncoding:(NSStringEncoding)encoding {
-    if (self.encoding == encoding) return;
+    if (self.encoding == encoding)
+        return;
     self.encoding = encoding;
     [PreferencesManager sharedManager].defaultEncoding = encoding;
     [[PreferencesManager sharedManager] savePreferences];
@@ -492,7 +505,8 @@
 }
 
 - (void)updateEmptyStateVisibility {
-    if (!self.editor || !self.emptyOverlayView) return;
+    if (!self.editor || !self.emptyOverlayView)
+        return;
     long length = [self.editor message:SCI_GETLENGTH];
     self.emptyOverlayView.hidden = (length > 0);
 }
@@ -508,51 +522,52 @@
 #pragma mark - Scintilla Notifications
 
 - (void)notification:(SCNotification *)notification {
-    if (!notification) return;
+    if (!notification)
+        return;
 
     switch (notification->nmhdr.code) {
-        case SCN_SAVEPOINTREACHED:
-            if (self.currentTab) {
-                self.currentTab.isDirty = NO;
-                [self.tabBarView reloadTabs];
-            }
-            [self updateWindowTitle];
-            break;
-        case SCN_SAVEPOINTLEFT:
-            if (self.currentTab) {
-                self.currentTab.isDirty = YES;
-                [self.tabBarView reloadTabs];
-            }
-            [self updateWindowTitle];
-            break;
-        case SCN_UPDATEUI:
-            [self updateStatusBar];
-            [[FindReplaceController sharedController] editorSelectionDidChange:self.editor];
-            break;
-        case SCN_MODIFIED:
-            if ((notification->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0) {
-                [[FindReplaceController sharedController] editorContentDidChange:self.editor];
-                [self updateEmptyStateVisibility];
-            }
-            break;
-        case SCN_CHARADDED:
-            if ([PreferencesManager sharedManager].autoIndent && (notification->ch == '\n' || notification->ch == '\r')) {
-                sptr_t curPos = [self.editor message:SCI_GETCURRENTPOS];
-                sptr_t curLine = [self.editor message:SCI_LINEFROMPOSITION wParam:curPos];
-                if (curLine > 0) {
-                    sptr_t prevIndentation = [self.editor message:SCI_GETLINEINDENTATION wParam:curLine - 1];
-                    if (prevIndentation > 0) {
-                        [self.editor message:SCI_SETLINEINDENTATION wParam:curLine lParam:prevIndentation];
-                        sptr_t indentPos = [self.editor message:SCI_GETLINEINDENTPOSITION wParam:curLine];
-                        [self.editor message:SCI_SETCURRENTPOS wParam:indentPos];
-                        [self.editor message:SCI_SETSELECTIONSTART wParam:indentPos];
-                        [self.editor message:SCI_SETSELECTIONEND wParam:indentPos];
-                    }
+    case SCN_SAVEPOINTREACHED:
+        if (self.currentTab) {
+            self.currentTab.isDirty = NO;
+            [self.tabBarView reloadTabs];
+        }
+        [self updateWindowTitle];
+        break;
+    case SCN_SAVEPOINTLEFT:
+        if (self.currentTab) {
+            self.currentTab.isDirty = YES;
+            [self.tabBarView reloadTabs];
+        }
+        [self updateWindowTitle];
+        break;
+    case SCN_UPDATEUI:
+        [self updateStatusBar];
+        [[FindReplaceController sharedController] editorSelectionDidChange:self.editor];
+        break;
+    case SCN_MODIFIED:
+        if ((notification->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0) {
+            [[FindReplaceController sharedController] editorContentDidChange:self.editor];
+            [self updateEmptyStateVisibility];
+        }
+        break;
+    case SCN_CHARADDED:
+        if ([PreferencesManager sharedManager].autoIndent && (notification->ch == '\n' || notification->ch == '\r')) {
+            sptr_t curPos = [self.editor message:SCI_GETCURRENTPOS];
+            sptr_t curLine = [self.editor message:SCI_LINEFROMPOSITION wParam:curPos];
+            if (curLine > 0) {
+                sptr_t prevIndentation = [self.editor message:SCI_GETLINEINDENTATION wParam:curLine - 1];
+                if (prevIndentation > 0) {
+                    [self.editor message:SCI_SETLINEINDENTATION wParam:curLine lParam:prevIndentation];
+                    sptr_t indentPos = [self.editor message:SCI_GETLINEINDENTPOSITION wParam:curLine];
+                    [self.editor message:SCI_SETCURRENTPOS wParam:indentPos];
+                    [self.editor message:SCI_SETSELECTIONSTART wParam:indentPos];
+                    [self.editor message:SCI_SETSELECTIONEND wParam:indentPos];
                 }
             }
-            break;
-        default:
-            break;
+        }
+        break;
+    default:
+        break;
     }
 }
 
@@ -577,7 +592,7 @@
                     return NO;
                 }
             } else if (response == NSAlertThirdButtonReturn) {
-                return NO; // Cancel
+                return NO;  // Cancel
             }
         }
     }
@@ -632,11 +647,11 @@
 }
 
 - (IBAction)printDocument:(nullable id)sender {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
     NSPrintInfo *pi = [NSPrintInfo sharedPrintInfo];
     // Create custom NSView that calls SCI_FORMATRANGE in drawRect:
-    ScintillaPrintView *pv = [[ScintillaPrintView alloc] initWithEditor:self.editor
-                                                              printInfo:pi];
+    ScintillaPrintView *pv = [[ScintillaPrintView alloc] initWithEditor:self.editor printInfo:pi];
     if (self.currentTab.title.length > 0) {
         pv.documentTitle = self.currentTab.title;
     }
@@ -644,8 +659,7 @@
     if (self.currentTab.title.length > 0) {
         [op setJobTitle:self.currentTab.title];
     }
-    [op runOperationModalForWindow:self.window delegate:nil
-                   didRunSelector:NULL contextInfo:NULL];
+    [op runOperationModalForWindow:self.window delegate:nil didRunSelector:NULL contextInfo:NULL];
 }
 
 - (IBAction)undo:(nullable id)sender {
@@ -661,23 +675,28 @@
 }
 
 - (IBAction)cut:(nullable id)sender {
-    if (self.editor) [self.editor message:SCI_CUT];
+    if (self.editor)
+        [self.editor message:SCI_CUT];
 }
 
 - (IBAction)copy:(nullable id)sender {
-    if (self.editor) [self.editor message:SCI_COPY];
+    if (self.editor)
+        [self.editor message:SCI_COPY];
 }
 
 - (IBAction)paste:(nullable id)sender {
-    if (self.editor) [self.editor message:SCI_PASTE];
+    if (self.editor)
+        [self.editor message:SCI_PASTE];
 }
 
 - (IBAction)delete:(nullable id)sender {
-    if (self.editor) [self.editor message:SCI_CLEAR];
+    if (self.editor)
+        [self.editor message:SCI_CLEAR];
 }
 
 - (IBAction)selectAll:(nullable id)sender {
-    if (self.editor) [self.editor message:SCI_SELECTALL];
+    if (self.editor)
+        [self.editor message:SCI_SELECTALL];
 }
 
 - (IBAction)showFind:(nullable id)sender {
@@ -711,27 +730,30 @@
     input.stringValue = [NSString stringWithFormat:@"%ld", (long)curLine];
     alert.accessoryView = input;
 
-    [alert beginSheetModalForWindow:self.window completionHandler:^(NSModalResponse returnCode) {
-        if (returnCode == NSAlertFirstButtonReturn) {
-            NSInteger targetLine = [input.stringValue integerValue];
-            if (targetLine > 0 && targetLine <= totalLines) {
-                sptr_t lineStartPos = [self.editor message:SCI_POSITIONFROMLINE wParam:(targetLine - 1)];
-                [self.editor message:SCI_GOTOPOS wParam:lineStartPos];
-                [self.editor message:SCI_SCROLLCARET];
-                [self updateStatusBar];
-            }
-        }
-    }];
+    [alert beginSheetModalForWindow:self.window
+                  completionHandler:^(NSModalResponse returnCode) {
+                      if (returnCode == NSAlertFirstButtonReturn) {
+                          NSInteger targetLine = [input.stringValue integerValue];
+                          if (targetLine > 0 && targetLine <= totalLines) {
+                              sptr_t lineStartPos = [self.editor message:SCI_POSITIONFROMLINE wParam:(targetLine - 1)];
+                              [self.editor message:SCI_GOTOPOS wParam:lineStartPos];
+                              [self.editor message:SCI_SCROLLCARET];
+                              [self updateStatusBar];
+                          }
+                      }
+                  }];
 }
 
 - (IBAction)insertTimeDate:(nullable id)sender {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
     NSDateFormatter *formatter = [[NSDateFormatter alloc] init];
     [formatter setDateFormat:@"h:mm a M/d/yyyy"];
     NSString *dateTimeString = [formatter stringFromDate:[NSDate date]];
     sptr_t curPos = [self.editor message:SCI_GETCURRENTPOS];
     [self.editor setStringProperty:SCI_INSERTTEXT parameter:curPos value:dateTimeString];
-    [self.editor message:SCI_GOTOPOS wParam:(curPos + [dateTimeString lengthOfBytesUsingEncoding:NSUTF8StringEncoding])];
+    [self.editor message:SCI_GOTOPOS
+                  wParam:(curPos + [dateTimeString lengthOfBytesUsingEncoding:NSUTF8StringEncoding])];
     [self.editor message:SCI_SCROLLCARET];
 }
 
@@ -845,7 +867,8 @@
         return YES;
     }
     if (action == @selector(toggleStatusBar:)) {
-        menuItem.state = [PreferencesManager sharedManager].showStatusBar ? NSControlStateValueOn : NSControlStateValueOff;
+        menuItem.state =
+            [PreferencesManager sharedManager].showStatusBar ? NSControlStateValueOn : NSControlStateValueOff;
         return YES;
     }
     if (action == @selector(toggleLineNumbers:)) {
@@ -853,15 +876,18 @@
         return YES;
     }
     if (action == @selector(setThemeLight:)) {
-        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeLight) ? NSControlStateValueOn : NSControlStateValueOff;
+        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeLight) ? NSControlStateValueOn
+                                                                                            : NSControlStateValueOff;
         return YES;
     }
     if (action == @selector(setThemeDark:)) {
-        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeDark) ? NSControlStateValueOn : NSControlStateValueOff;
+        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeDark) ? NSControlStateValueOn
+                                                                                           : NSControlStateValueOff;
         return YES;
     }
     if (action == @selector(setThemeSystem:)) {
-        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeSystem) ? NSControlStateValueOn : NSControlStateValueOff;
+        menuItem.state = ([PreferencesManager sharedManager].themeMode == NPThemeModeSystem) ? NSControlStateValueOn
+                                                                                             : NSControlStateValueOff;
         return YES;
     }
     if (action == @selector(revertDocument:)) {

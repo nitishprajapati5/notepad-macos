@@ -10,9 +10,7 @@
 + (instancetype)sharedManager {
     static NotepadFileManager *instance = nil;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        instance = [[NotepadFileManager alloc] init];
-    });
+    dispatch_once(&onceToken, ^{ instance = [[NotepadFileManager alloc] init]; });
     return instance;
 }
 
@@ -24,11 +22,12 @@
 
     NSWindow *parentWindow = controller ? controller.window : [NSApp keyWindow];
     if (parentWindow) {
-        [panel beginSheetModalForWindow:parentWindow completionHandler:^(NSModalResponse result) {
-            if (result == NSModalResponseOK && panel.URL.path) {
-                [self openFileAtPath:panel.URL.path inController:controller];
-            }
-        }];
+        [panel beginSheetModalForWindow:parentWindow
+                      completionHandler:^(NSModalResponse result) {
+                          if (result == NSModalResponseOK && panel.URL.path) {
+                              [self openFileAtPath:panel.URL.path inController:controller];
+                          }
+                      }];
     } else {
         if ([panel runModal] == NSModalResponseOK && panel.URL.path) {
             [self openFileAtPath:panel.URL.path inController:controller];
@@ -41,7 +40,8 @@
     if (!data) {
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = @"Could not open file";
-        alert.informativeText = [NSString stringWithFormat:@"The file \"%@\" could not be read.", [path lastPathComponent]];
+        alert.informativeText =
+            [NSString stringWithFormat:@"The file \"%@\" could not be read.", [path lastPathComponent]];
         [alert runModal];
         return;
     }
@@ -184,7 +184,7 @@
     } else if (eolMode == SC_EOL_CR) {
         normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
         normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\n" withString:@"\r"];
-    } else { // SC_EOL_LF
+    } else {  // SC_EOL_LF
         normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
         normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\r" withString:@"\n"];
     }
@@ -198,16 +198,17 @@
     }
 
     BOOL success = [normalizedContent writeToFile:controller.filePath
-                                      atomically:YES
-                                        encoding:controller.encoding
-                                           error:&error];
+                                       atomically:YES
+                                         encoding:controller.encoding
+                                            error:&error];
 
     if (success) {
         [controller.editor message:SCI_SETSAVEPOINT];
         controller.isDirty = NO;
         [controller updateWindowTitle];
         [controller updateStatusBar];
-        [[NSDocumentController sharedDocumentController] noteNewRecentDocumentURL:[NSURL fileURLWithPath:controller.filePath]];
+        [[NSDocumentController sharedDocumentController]
+            noteNewRecentDocumentURL:[NSURL fileURLWithPath:controller.filePath]];
         return YES;
     } else {
         NSAlert *alert = [[NSAlert alloc] init];
@@ -244,17 +245,18 @@
     }
 
     NSAlert *alert = [[NSAlert alloc] init];
-    alert.messageText = [NSString stringWithFormat:@"Revert to saved version of \"%@\"?",
-                         [controller.filePath lastPathComponent]];
+    alert.messageText =
+        [NSString stringWithFormat:@"Revert to saved version of \"%@\"?", [controller.filePath lastPathComponent]];
     alert.informativeText = @"All unsaved changes made since last save will be lost.";
     [alert addButtonWithTitle:@"Revert"];
     [alert addButtonWithTitle:@"Cancel"];
 
-    [alert beginSheetModalForWindow:controller.window completionHandler:^(NSModalResponse returnCode) {
-        if (returnCode == NSAlertFirstButtonReturn) {
-            [self openFileAtPath:controller.filePath inController:controller];
-        }
-    }];
+    [alert beginSheetModalForWindow:controller.window
+                  completionHandler:^(NSModalResponse returnCode) {
+                      if (returnCode == NSAlertFirstButtonReturn) {
+                          [self openFileAtPath:controller.filePath inController:controller];
+                      }
+                  }];
 }
 
 @end

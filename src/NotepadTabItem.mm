@@ -25,6 +25,10 @@
     item.emptyOverlayView = [[EmptyDocumentOverlayView alloc] initWithFrame:NSMakeRect(0, 0, 800, 600)];
     item.emptyOverlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
 
+    if ([PreferencesManager sharedManager].useRandomTabColors) {
+        item.tabColor = [PreferencesManager randomVibrantColor];
+    }
+
     return item;
 }
 

@@ -2,7 +2,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
-@interface PreferencesWindowController : NSWindowController <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
+@interface PreferencesWindowController
+    : NSWindowController <NSTableViewDataSource, NSTableViewDelegate, NSWindowDelegate>
 
 + (instancetype)sharedPreferencesWindowController;
 - (void)showWindow:(nullable id)sender;

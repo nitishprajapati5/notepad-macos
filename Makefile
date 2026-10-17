@@ -110,5 +110,13 @@ $(SCI_OBJ_DIR) $(COCOA_OBJ_DIR) $(APP_OBJ_DIR) $(MACOS_DIR) $(CONTENTS_DIR) $(RE
 run: all
 	open $(BUNDLE_DIR)
 
+CLANG_FORMAT ?= $(shell xcrun -f clang-format 2>/dev/null || which clang-format 2>/dev/null || echo "/Library/Developer/CommandLineTools/usr/bin/clang-format")
+
+format:
+	@echo "Formatting sources in src/..."
+	@$(CLANG_FORMAT) -i -style=file src/*.h src/*.mm
+	@echo "✅ Formatted successfully"
+
 clean:
 	rm -rf build/
+

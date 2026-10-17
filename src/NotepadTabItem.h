@@ -13,6 +13,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, assign) NSStringEncoding encoding;
 @property (nonatomic, strong) ScintillaView *editor;
 @property (nonatomic, strong) EmptyDocumentOverlayView *emptyOverlayView;
+@property (nonatomic, strong, nullable) NSColor *tabColor;
 
 + (instancetype)tabWithTitle:(NSString *)title filePath:(nullable NSString *)filePath;
 

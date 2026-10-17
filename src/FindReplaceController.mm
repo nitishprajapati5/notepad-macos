@@ -24,19 +24,16 @@ static const int kCurrentMatchIndicator = 29;
 + (instancetype)sharedController {
     static FindReplaceController *sharedInstance = nil;
     static dispatch_once_t onceToken;
-    dispatch_once(&onceToken, ^{
-        sharedInstance = [[FindReplaceController alloc] init];
-    });
+    dispatch_once(&onceToken, ^{ sharedInstance = [[FindReplaceController alloc] init]; });
     return sharedInstance;
 }
 
 - (instancetype)init {
-    NSPanel *panel = [[NSPanel alloc] initWithContentRect:NSMakeRect(240, 260, 440, 245)
-                                                styleMask:NSWindowStyleMaskTitled |
-                                                          NSWindowStyleMaskClosable |
-                                                          NSWindowStyleMaskUtilityWindow
-                                                  backing:NSBackingStoreBuffered
-                                                    defer:NO];
+    NSPanel *panel = [[NSPanel alloc]
+        initWithContentRect:NSMakeRect(240, 260, 440, 245)
+                  styleMask:NSWindowStyleMaskTitled | NSWindowStyleMaskClosable | NSWindowStyleMaskUtilityWindow
+                    backing:NSBackingStoreBuffered
+                      defer:NO];
     [panel setTitle:@"Find & Replace"];
     [panel setHidesOnDeactivate:NO];
     [panel setFloatingPanel:YES];
@@ -116,7 +113,7 @@ static const int kCurrentMatchIndicator = 29;
     // 5. Action Buttons (Bottom Bar)
     NSButton *btnFindNext = [NSButton buttonWithTitle:@"Find Next" target:self action:@selector(findNext)];
     btnFindNext.frame = NSMakeRect(14, 16, 82, 30);
-    btnFindNext.keyEquivalent = @"\r"; // Enter triggers Find Next
+    btnFindNext.keyEquivalent = @"\r";  // Enter triggers Find Next
     [cv addSubview:btnFindNext];
 
     NSButton *btnFindPrev = [NSButton buttonWithTitle:@"Find Prev" target:self action:@selector(findPrevious)];
@@ -133,7 +130,7 @@ static const int kCurrentMatchIndicator = 29;
 
     NSButton *btnClose = [NSButton buttonWithTitle:@"Close" target:self action:@selector(closePanel)];
     btnClose.frame = NSMakeRect(354, 16, 72, 30);
-    btnClose.keyEquivalent = @"\e"; // Esc triggers Close
+    btnClose.keyEquivalent = @"\e";  // Esc triggers Close
     [cv addSubview:btnClose];
 
     // Key view loop for tab navigation
@@ -167,7 +164,8 @@ static const int kCurrentMatchIndicator = 29;
                 std::vector<char> buf(len + 1, 0);
                 [editor message:SCI_GETSELTEXT wParam:0 lParam:(sptr_t)buf.data()];
                 NSString *selectedText = [NSString stringWithUTF8String:buf.data()];
-                if (selectedText.length > 0 && ![selectedText containsString:@"\n"] && ![selectedText containsString:@"\r"]) {
+                if (selectedText.length > 0 && ![selectedText containsString:@"\n"] &&
+                    ![selectedText containsString:@"\r"]) {
                     _findField.stringValue = selectedText;
                     [_findField selectText:nil];
                 }
@@ -219,8 +217,9 @@ static const int kCurrentMatchIndicator = 29;
 
 #pragma mark - Regex & Search Flags
 
-- (BOOL)isRegexValid:(NSString *)pattern error:(NSString * _Nullable * _Nullable)outError {
-    if (pattern.length == 0) return YES;
+- (BOOL)isRegexValid:(NSString *)pattern error:(NSString *_Nullable *_Nullable)outError {
+    if (pattern.length == 0)
+        return YES;
     NSError *err = nil;
     NSRegularExpressionOptions opts = 0;
     if (_caseSensitiveCheck.state == NSControlStateValueOff) {
@@ -228,7 +227,8 @@ static const int kCurrentMatchIndicator = 29;
     }
     [NSRegularExpression regularExpressionWithPattern:pattern options:opts error:&err];
     if (err) {
-        if (outError) *outError = err.localizedDescription;
+        if (outError)
+            *outError = err.localizedDescription;
         return NO;
     }
     return YES;
@@ -250,7 +250,8 @@ static const int kCurrentMatchIndicator = 29;
 }
 
 - (NSString *)scintillaRegexReplacementString:(NSString *)replacement {
-    if (replacement.length == 0) return @"";
+    if (replacement.length == 0)
+        return @"";
     NSMutableString *result = [NSMutableString string];
     NSUInteger len = replacement.length;
     for (NSUInteger i = 0; i < len; i++) {
@@ -279,25 +280,27 @@ static const int kCurrentMatchIndicator = 29;
 #pragma mark - Highlight & Indicator Setup
 
 - (void)setupIndicatorsInEditor:(ScintillaView *)editor {
-    if (!editor) return;
+    if (!editor)
+        return;
 
     // Indicator 28: All document matches (amber/gold translucent box)
     [editor message:SCI_INDICSETSTYLE wParam:kFindIndicator lParam:INDIC_ROUNDBOX];
-    [editor message:SCI_INDICSETFORE wParam:kFindIndicator lParam:0x00BEFF]; // RGB(255, 190, 0)
+    [editor message:SCI_INDICSETFORE wParam:kFindIndicator lParam:0x00BEFF];  // RGB(255, 190, 0)
     [editor message:SCI_INDICSETALPHA wParam:kFindIndicator lParam:75];
     [editor message:SCI_INDICSETOUTLINEALPHA wParam:kFindIndicator lParam:180];
     [editor message:SCI_INDICSETUNDER wParam:kFindIndicator lParam:1];
 
     // Indicator 29: Current active match (vibrant tangerine highlight)
     [editor message:SCI_INDICSETSTYLE wParam:kCurrentMatchIndicator lParam:INDIC_ROUNDBOX];
-    [editor message:SCI_INDICSETFORE wParam:kCurrentMatchIndicator lParam:0x006EFF]; // RGB(255, 110, 0)
+    [editor message:SCI_INDICSETFORE wParam:kCurrentMatchIndicator lParam:0x006EFF];  // RGB(255, 110, 0)
     [editor message:SCI_INDICSETALPHA wParam:kCurrentMatchIndicator lParam:160];
     [editor message:SCI_INDICSETOUTLINEALPHA wParam:kCurrentMatchIndicator lParam:255];
     [editor message:SCI_INDICSETUNDER wParam:kCurrentMatchIndicator lParam:1];
 }
 
 - (void)clearHighlights {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
     long docLength = [self.editor message:SCI_GETLENGTH];
     if (docLength > 0) {
         [self.editor message:SCI_SETINDICATORCURRENT wParam:kFindIndicator lParam:0];
@@ -308,9 +311,11 @@ static const int kCurrentMatchIndicator = 29;
 }
 
 - (void)highlightCurrentMatch {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
     long docLength = [self.editor message:SCI_GETLENGTH];
-    if (docLength <= 0) return;
+    if (docLength <= 0)
+        return;
 
     [self.editor message:SCI_SETINDICATORCURRENT wParam:kCurrentMatchIndicator lParam:0];
     [self.editor message:SCI_INDICATORCLEARRANGE wParam:0 lParam:docLength];
@@ -444,12 +449,12 @@ static const int kCurrentMatchIndicator = 29;
         _statusLabel.stringValue = @"No matches found";
         _statusLabel.textColor = [NSColor secondaryLabelColor];
     } else if (_currentMatchIndex >= 0) {
-        _statusLabel.stringValue = [NSString stringWithFormat:@"%ld of %ld matches",
-                                    (long)(_currentMatchIndex + 1), (long)_cachedMatches.count];
+        _statusLabel.stringValue = [NSString
+            stringWithFormat:@"%ld of %ld matches", (long)(_currentMatchIndex + 1), (long)_cachedMatches.count];
         _statusLabel.textColor = [NSColor controlTextColor];
     } else {
-        _statusLabel.stringValue = [NSString stringWithFormat:@"%ld match%@ found",
-                                    (long)_cachedMatches.count, _cachedMatches.count == 1 ? @"" : @"es"];
+        _statusLabel.stringValue = [NSString
+            stringWithFormat:@"%ld match%@ found", (long)_cachedMatches.count, _cachedMatches.count == 1 ? @"" : @"es"];
         _statusLabel.textColor = [NSColor secondaryLabelColor];
     }
 }
@@ -465,7 +470,8 @@ static const int kCurrentMatchIndicator = 29;
 }
 
 - (void)searchWithDirectionBackwards:(BOOL)backwards {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
 
     NSString *query = _findField.stringValue;
     if (query.length == 0) {
@@ -518,7 +524,7 @@ static const int kCurrentMatchIndicator = 29;
 
         if (targetIndex < 0) {
             if (wrapAround) {
-                targetIndex = 0; // Wrap to beginning
+                targetIndex = 0;  // Wrap to beginning
             } else {
                 NSBeep();
                 _statusLabel.stringValue = @"Reached end of document";
@@ -537,7 +543,7 @@ static const int kCurrentMatchIndicator = 29;
 
         if (targetIndex < 0) {
             if (wrapAround) {
-                targetIndex = _cachedMatches.count - 1; // Wrap to end
+                targetIndex = _cachedMatches.count - 1;  // Wrap to end
             } else {
                 NSBeep();
                 _statusLabel.stringValue = @"Reached beginning of document";
@@ -558,8 +564,8 @@ static const int kCurrentMatchIndicator = 29;
         // Highlight active match prominently
         [self highlightCurrentMatch];
 
-        _statusLabel.stringValue = [NSString stringWithFormat:@"%ld of %ld matches",
-                                    (long)(_currentMatchIndex + 1), (long)_cachedMatches.count];
+        _statusLabel.stringValue = [NSString
+            stringWithFormat:@"%ld of %ld matches", (long)(_currentMatchIndex + 1), (long)_cachedMatches.count];
         _statusLabel.textColor = [NSColor controlTextColor];
     }
 }
@@ -567,10 +573,12 @@ static const int kCurrentMatchIndicator = 29;
 #pragma mark - Replace Operations
 
 - (void)replaceAndFindNext {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
 
     NSString *query = _findField.stringValue;
-    if (query.length == 0) return;
+    if (query.length == 0)
+        return;
 
     [self updateMatchesAndHighlight:NO];
 
@@ -626,10 +634,12 @@ static const int kCurrentMatchIndicator = 29;
 }
 
 - (void)replaceAll {
-    if (!self.editor) return;
+    if (!self.editor)
+        return;
 
     NSString *query = _findField.stringValue;
-    if (query.length == 0) return;
+    if (query.length == 0)
+        return;
 
     BOOL isRegex = (_regexCheck.state == NSControlStateValueOn);
     if (isRegex) {
@@ -680,7 +690,7 @@ static const int kCurrentMatchIndicator = 29;
         replacedCount++;
         long nextSearchPos = mStart + replacedLen;
         if (nextSearchPos <= searchPos) {
-            searchPos++; // guard against zero-length infinite loops
+            searchPos++;  // guard against zero-length infinite loops
         } else {
             searchPos = nextSearchPos;
         }
@@ -690,22 +700,24 @@ static const int kCurrentMatchIndicator = 29;
 
     [self updateMatchesAndHighlight:YES];
 
-    _statusLabel.stringValue = [NSString stringWithFormat:@"Replaced %ld occurrence%@",
-                                (long)replacedCount, replacedCount == 1 ? @"" : @"s"];
+    _statusLabel.stringValue =
+        [NSString stringWithFormat:@"Replaced %ld occurrence%@", (long)replacedCount, replacedCount == 1 ? @"" : @"s"];
     _statusLabel.textColor = [NSColor controlTextColor];
 }
 
 #pragma mark - External Editor Events
 
 - (void)editorContentDidChange:(nullable ScintillaView *)editor {
-    if (!self.window.isVisible) return;
+    if (!self.window.isVisible)
+        return;
     if (editor && editor == self.editor) {
         [self updateMatchesAndHighlight:YES];
     }
 }
 
 - (void)editorSelectionDidChange:(nullable ScintillaView *)editor {
-    if (!self.window.isVisible) return;
+    if (!self.window.isVisible)
+        return;
     if (editor && editor == self.editor && _cachedMatches.count > 0) {
         long selStart = [self.editor getGeneralProperty:SCI_GETSELECTIONSTART];
         long selEnd = [self.editor getGeneralProperty:SCI_GETSELECTIONEND];
@@ -721,12 +733,12 @@ static const int kCurrentMatchIndicator = 29;
             _currentMatchIndex = newIndex;
             [self highlightCurrentMatch];
             if (_currentMatchIndex >= 0) {
-                _statusLabel.stringValue = [NSString stringWithFormat:@"%ld of %ld matches",
-                                            (long)(_currentMatchIndex + 1), (long)_cachedMatches.count];
+                _statusLabel.stringValue = [NSString
+                    stringWithFormat:@"%ld of %ld matches", (long)(_currentMatchIndex + 1), (long)_cachedMatches.count];
                 _statusLabel.textColor = [NSColor controlTextColor];
             } else {
-                _statusLabel.stringValue = [NSString stringWithFormat:@"%ld match%@ found",
-                                            (long)_cachedMatches.count, _cachedMatches.count == 1 ? @"" : @"es"];
+                _statusLabel.stringValue = [NSString stringWithFormat:@"%ld match%@ found", (long)_cachedMatches.count,
+                                                                      _cachedMatches.count == 1 ? @"" : @"es"];
                 _statusLabel.textColor = [NSColor secondaryLabelColor];
             }
         }

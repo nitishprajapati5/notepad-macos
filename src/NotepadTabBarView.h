@@ -3,6 +3,8 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+static const CGFloat kNotepadTabBarHeight = 28.0;
+
 @class NotepadTabBarView;
 
 @protocol NotepadTabBarViewDelegate <NSObject>
