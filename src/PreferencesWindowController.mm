@@ -23,7 +23,8 @@
 
 @interface NPColorSwatchRowView : NSView
 @property (nonatomic, strong) NSArray<NSColor *> *swatchColors;
-@property (nonatomic, assign) NSInteger selectedIndex;               // -1 = custom/none
+@property (nonatomic, assign) NSInteger selectedIndex;  // -1 = custom/none
+@property (nonatomic, assign) BOOL isDark;
 @property (nonatomic, copy) void (^onSelectIndex)(NSInteger index);  // -1 = open color picker
 @end
 
@@ -43,6 +44,11 @@ static const NSInteger NPCustomIdx = 999;
         _selectedIndex = 0;
     }
     return self;
+}
+
+- (void)setIsDark:(BOOL)isDark {
+    _isDark = isDark;
+    [self setNeedsDisplay:YES];
 }
 
 - (void)updateTrackingAreas {
@@ -83,6 +89,8 @@ static const NSInteger NPCustomIdx = 999;
 - (void)drawRect:(NSRect)dirtyRect {
     [super drawRect:dirtyRect];
 
+    BOOL dark = self.isDark;
+
     for (NSInteger i = 0; i < (NSInteger)self.swatchColors.count; i++) {
         NSRect r = [self rectForIndex:i];
         BOOL sel = (i == _selectedIndex);
@@ -90,17 +98,24 @@ static const NSInteger NPCustomIdx = 999;
 
         // Outer selection ring + gap
         if (sel) {
-            NSBezierPath *ring = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(r, -4.5, -4.5)];
-            [[NSColor colorWithCalibratedWhite:0.80 alpha:1.0] setStroke];
-            ring.lineWidth = 2.5;
+            NSBezierPath *ring = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(r, -4.0, -4.0)];
+            NSColor *ringColor = dark ? [NSColor colorWithCalibratedWhite:0.88 alpha:1.0]
+                                      : [NSColor colorWithCalibratedWhite:0.20 alpha:1.0];
+            [ringColor setStroke];
+            ring.lineWidth = 2.0;
             [ring stroke];
-            // Gap ring (card bg color)
+
+            // Gap ring matching card background
             NSBezierPath *gap = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(r, -1.5, -1.5)];
-            [[NSColor colorWithCalibratedWhite:0.14 alpha:1.0] setFill];
+            NSColor *gapColor =
+                dark ? [NSColor colorWithCalibratedRed:0.115 green:0.115 blue:0.135 alpha:1.0] : [NSColor whiteColor];
+            [gapColor setFill];
             [gap fill];
         } else if (hov) {
-            NSBezierPath *hovRing = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(r, -3, -3)];
-            [[NSColor colorWithCalibratedWhite:0.55 alpha:0.5] setStroke];
+            NSBezierPath *hovRing = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(r, -2.5, -2.5)];
+            NSColor *hovColor = dark ? [NSColor colorWithCalibratedWhite:0.60 alpha:0.5]
+                                     : [NSColor colorWithCalibratedWhite:0.40 alpha:0.4];
+            [hovColor setStroke];
             hovRing.lineWidth = 1.5;
             [hovRing stroke];
         }
@@ -108,22 +123,34 @@ static const NSInteger NPCustomIdx = 999;
         NSBezierPath *circle = [NSBezierPath bezierPathWithOvalInRect:r];
         [self.swatchColors[i] setFill];
         [circle fill];
-        [[NSColor colorWithCalibratedWhite:0.0 alpha:0.20] setStroke];
+
+        // Border for swatches (ensures pastels and light colors pop cleanly against white card background)
+        NSColor *swatchBorder = dark ? [NSColor colorWithCalibratedWhite:0.0 alpha:0.35]
+                                     : [NSColor colorWithCalibratedWhite:0.0 alpha:0.18];
+        [swatchBorder setStroke];
         circle.lineWidth = 1.0;
         [circle stroke];
 
-        // White checkmark for selected
+        // Crisp checkmark for selected swatch with subtle shadow
         if (sel) {
             CGFloat cx = NSMidX(r), cy = NSMidY(r);
             NSBezierPath *ck = [NSBezierPath bezierPath];
-            [ck moveToPoint:NSMakePoint(cx - 5.5, cy - 1.0)];
-            [ck lineToPoint:NSMakePoint(cx - 1.5, cy - 5.0)];
-            [ck lineToPoint:NSMakePoint(cx + 6.5, cy + 5.0)];
+            [ck moveToPoint:NSMakePoint(cx - 5.0, cy - 0.5)];
+            [ck lineToPoint:NSMakePoint(cx - 1.5, cy - 4.5)];
+            [ck lineToPoint:NSMakePoint(cx + 6.0, cy + 4.5)];
             ck.lineCapStyle = NSLineCapStyleRound;
             ck.lineJoinStyle = NSLineJoinStyleRound;
             ck.lineWidth = 2.2;
+
+            [NSGraphicsContext saveGraphicsState];
+            NSShadow *ckShadow = [[NSShadow alloc] init];
+            ckShadow.shadowColor = [NSColor colorWithCalibratedWhite:0.0 alpha:0.45];
+            ckShadow.shadowOffset = NSMakeSize(0, -0.8);
+            ckShadow.shadowBlurRadius = 1.5;
+            [ckShadow set];
             [[NSColor whiteColor] setStroke];
             [ck stroke];
+            [NSGraphicsContext restoreGraphicsState];
         }
     }
 
@@ -133,27 +160,38 @@ static const NSInteger NPCustomIdx = 999;
     BOOL customHov = (_hovered == NPCustomIdx);
 
     if (customSel) {
-        NSBezierPath *ring = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(cr, -4.5, -4.5)];
-        [[NSColor colorWithCalibratedWhite:0.80 alpha:1.0] setStroke];
-        ring.lineWidth = 2.5;
+        NSBezierPath *ring = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(cr, -4.0, -4.0)];
+        NSColor *ringColor = dark ? [NSColor colorWithCalibratedWhite:0.88 alpha:1.0]
+                                  : [NSColor colorWithCalibratedWhite:0.20 alpha:1.0];
+        [ringColor setStroke];
+        ring.lineWidth = 2.0;
         [ring stroke];
+
         NSBezierPath *gap = [NSBezierPath bezierPathWithOvalInRect:NSInsetRect(cr, -1.5, -1.5)];
-        [[NSColor colorWithCalibratedWhite:0.14 alpha:1.0] setFill];
+        NSColor *gapColor =
+            dark ? [NSColor colorWithCalibratedRed:0.115 green:0.115 blue:0.135 alpha:1.0] : [NSColor whiteColor];
+        [gapColor setFill];
         [gap fill];
     }
 
     NSBezierPath *cCircle = [NSBezierPath bezierPathWithOvalInRect:cr];
-    [[NSColor colorWithCalibratedWhite:customHov ? 0.38 : 0.24 alpha:1.0] setFill];
+    NSColor *cFill = dark ? [NSColor colorWithCalibratedWhite:customHov ? 0.32 : 0.22 alpha:1.0]
+                          : [NSColor colorWithCalibratedWhite:customHov ? 0.88 : 0.94 alpha:1.0];
+    [cFill setFill];
     [cCircle fill];
-    [[NSColor colorWithCalibratedWhite:0.46 alpha:1.0] setStroke];
-    cCircle.lineWidth = 1.2;
+
+    NSColor *cStroke =
+        dark ? [NSColor colorWithCalibratedWhite:0.38 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.72 alpha:1.0];
+    [cStroke setStroke];
+    cCircle.lineWidth = 1.0;
     [cCircle stroke];
 
     // "+" icon
     NSString *plusStr = @"+";
     NSDictionary *plusAttrs = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:17.0 weight:NSFontWeightLight],
-        NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.82 alpha:1.0]
+        NSFontAttributeName: [NSFont systemFontOfSize:16.0 weight:NSFontWeightLight],
+        NSForegroundColorAttributeName: dark ? [NSColor colorWithCalibratedWhite:0.85 alpha:1.0]
+                                             : [NSColor colorWithCalibratedWhite:0.35 alpha:1.0]
     };
     NSSize psz = [plusStr sizeWithAttributes:plusAttrs];
     [plusStr drawAtPoint:NSMakePoint(NSMidX(cr) - psz.width / 2.0, NSMidY(cr) - psz.height / 2.0 - 0.5)
@@ -212,24 +250,91 @@ static const NSInteger NPCustomIdx = 999;
     [self setNeedsDisplay:YES];
 }
 
-static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
-    NSBezierPath *p = [NSBezierPath bezierPath];
-    [p moveToPoint:NSMakePoint(rect.origin.x, rect.origin.y)];
-    [p lineToPoint:NSMakePoint(rect.origin.x, NSMaxY(rect) - radius)];
-    [p appendBezierPathWithArcWithCenter:NSMakePoint(rect.origin.x + radius, NSMaxY(rect) - radius)
-                                  radius:radius
-                              startAngle:180
-                                endAngle:90
-                               clockwise:YES];
-    [p lineToPoint:NSMakePoint(NSMaxX(rect) - radius, NSMaxY(rect))];
-    [p appendBezierPathWithArcWithCenter:NSMakePoint(NSMaxX(rect) - radius, NSMaxY(rect) - radius)
-                                  radius:radius
-                              startAngle:90
-                                endAngle:0
-                               clockwise:YES];
-    [p lineToPoint:NSMakePoint(NSMaxX(rect), rect.origin.y)];
-    [p closePath];
-    *outPath = p;
+static void NPDrawPreviewFloppy(NSRect rect, BOOL dark, BOOL isSelected) {
+    CGFloat x = rect.origin.x;
+    CGFloat y = rect.origin.y;
+    CGFloat w = rect.size.width;
+    CGFloat h = rect.size.height;
+
+    NSColor *bodyColor = isSelected ? [NSColor colorWithCalibratedWhite:0.98 alpha:0.98]
+                                    : (dark ? [NSColor colorWithCalibratedWhite:0.75 alpha:0.9]
+                                            : [NSColor colorWithCalibratedWhite:0.38 alpha:0.9]);
+    NSColor *shutterColor = isSelected ? [NSColor colorWithCalibratedWhite:0.98 alpha:0.98]
+                                       : [NSColor colorWithCalibratedRed:0.26 green:0.78 blue:1.0 alpha:1.0];
+
+    // Floppy body with notched top-right corner
+    NSBezierPath *body = [NSBezierPath bezierPath];
+    CGFloat r = 1.0;
+    CGFloat notch = 2.4;
+
+    [body moveToPoint:NSMakePoint(x + r, y)];
+    [body lineToPoint:NSMakePoint(x + w - r, y)];
+    [body appendBezierPathWithArcWithCenter:NSMakePoint(x + w - r, y + r)
+                                     radius:r
+                                 startAngle:270
+                                   endAngle:0
+                                  clockwise:NO];
+    [body lineToPoint:NSMakePoint(x + w, y + h - notch)];
+    [body lineToPoint:NSMakePoint(x + w - notch, y + h)];
+    [body lineToPoint:NSMakePoint(x + r, y + h)];
+    [body appendBezierPathWithArcWithCenter:NSMakePoint(x + r, y + h - r)
+                                     radius:r
+                                 startAngle:90
+                                   endAngle:180
+                                  clockwise:NO];
+    [body lineToPoint:NSMakePoint(x, y + r)];
+    [body appendBezierPathWithArcWithCenter:NSMakePoint(x + r, y + r)
+                                     radius:r
+                                 startAngle:180
+                                   endAngle:270
+                                  clockwise:NO];
+    [body closePath];
+
+    [bodyColor setStroke];
+    body.lineWidth = 1.0;
+    [body stroke];
+
+    // Metal shutter at top
+    CGFloat shW = w * 0.52;
+    CGFloat shH = h * 0.40;
+    CGFloat shX = x + (w - shW) / 2.0;
+    CGFloat shY = y + h - shH;
+    NSBezierPath *shutter = [NSBezierPath bezierPathWithRect:NSMakeRect(shX, shY, shW, shH)];
+    [shutterColor setStroke];
+    shutter.lineWidth = 0.85;
+    [shutter stroke];
+}
+
+static void NPDrawPreviewClose(NSRect rect, NSColor *color) {
+    CGFloat cx = rect.origin.x + rect.size.width / 2.0;
+    CGFloat cy = rect.origin.y + rect.size.height / 2.0;
+    CGFloat xr = 2.6;
+
+    NSBezierPath *xPath = [NSBezierPath bezierPath];
+    [xPath moveToPoint:NSMakePoint(cx - xr, cy - xr)];
+    [xPath lineToPoint:NSMakePoint(cx + xr, cy + xr)];
+    [xPath moveToPoint:NSMakePoint(cx - xr, cy + xr)];
+    [xPath lineToPoint:NSMakePoint(cx + xr, cy - xr)];
+    xPath.lineWidth = 1.2;
+    xPath.lineCapStyle = NSLineCapStyleRound;
+    [color setStroke];
+    [xPath stroke];
+}
+
+static void NPDrawPreviewPlus(NSRect rect, NSColor *color) {
+    CGFloat pcx = rect.origin.x + rect.size.width / 2.0;
+    CGFloat pcy = rect.origin.y + rect.size.height / 2.0;
+    CGFloat pr = 3.6;
+
+    NSBezierPath *plusPath = [NSBezierPath bezierPath];
+    [plusPath moveToPoint:NSMakePoint(pcx - pr, pcy)];
+    [plusPath lineToPoint:NSMakePoint(pcx + pr, pcy)];
+    [plusPath moveToPoint:NSMakePoint(pcx, pcy - pr)];
+    [plusPath lineToPoint:NSMakePoint(pcx, pcy + pr)];
+    plusPath.lineWidth = 1.3;
+    plusPath.lineCapStyle = NSLineCapStyleRound;
+    [color setStroke];
+    [plusPath stroke];
 }
 
 - (void)drawRect:(NSRect)dirtyRect {
@@ -239,149 +344,144 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     BOOL dark = self.isDark;
 
     // Container background
-    NSColor *barBg = dark ? [NSColor colorWithCalibratedRed:0.085 green:0.090 blue:0.100 alpha:1.0]
-                          : [NSColor colorWithCalibratedWhite:0.895 alpha:1.0];
-    NSBezierPath *bgPath = [NSBezierPath bezierPathWithRoundedRect:bounds xRadius:8.0 yRadius:8.0];
+    NSColor *barBg = dark ? [NSColor colorWithCalibratedRed:0.09 green:0.095 blue:0.105 alpha:1.0]
+                          : [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
+    NSBezierPath *bgPath = [NSBezierPath bezierPathWithRoundedRect:bounds xRadius:6.0 yRadius:6.0];
     [barBg setFill];
     [bgPath fill];
 
-    // Container border
+    // Container border - crisp in both light and dark modes
     NSColor *borderColor =
-        dark ? [NSColor colorWithCalibratedWhite:0.22 alpha:0.60] : [NSColor colorWithCalibratedWhite:0.70 alpha:0.80];
+        dark ? [NSColor colorWithCalibratedWhite:0.24 alpha:0.80] : [NSColor colorWithCalibratedWhite:0.72 alpha:1.0];
     [borderColor setStroke];
     bgPath.lineWidth = 1.0;
     [bgPath stroke];
 
-    // Bottom separator line (editor boundary)
+    // Bottom border separating tab bar from editor
     NSColor *sepColor =
-        dark ? [NSColor colorWithCalibratedWhite:0.18 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.76 alpha:1.0];
+        dark ? [NSColor colorWithCalibratedWhite:0.0 alpha:0.5] : [NSColor colorWithCalibratedWhite:0.75 alpha:1.0];
     [sepColor setFill];
     NSRectFill(NSMakeRect(0, 0, bounds.size.width, 1.0));
 
-    // ─── Active Tab ───────────────────────────────────────────────────────
-    CGFloat tabH = bounds.size.height - 8.0;
-    CGFloat tabY = 2.0;
-    CGFloat activeW = 148.0;
+    // Tabs geometry: modern floating pills, height 24 pt
+    CGFloat tabH = 24.0;
+    CGFloat tabY = (bounds.size.height - tabH) / 2.0;
+
+    // ─── Active Tab ("new 1") ─────────────────────────────────────────────
+    CGFloat activeW = 120.0;
     NSRect activeRect = NSMakeRect(8.0, tabY, activeW, tabH);
+    NSBezierPath *activePath = [NSBezierPath bezierPathWithRoundedRect:activeRect xRadius:5.0 yRadius:5.0];
+
+    [NSGraphicsContext saveGraphicsState];
+    NSShadow *shadow = [[NSShadow alloc] init];
+    shadow.shadowColor = [NSColor colorWithCalibratedWhite:0.0 alpha:dark ? 0.40 : 0.15];
+    shadow.shadowOffset = NSMakeSize(0, -1.0);
+    shadow.shadowBlurRadius = 3.0;
+    [shadow set];
 
     NSColor *base = self.baseColor ?: [NSColor colorWithCalibratedRed:0.85 green:0.51 blue:0.15 alpha:1.0];
     NSColor *rgb = [base colorUsingColorSpace:[NSColorSpace genericRGBColorSpace]] ?: base;
     CGFloat cr = 0, cg = 0, cb = 0, ca = 1.0;
     [rgb getRed:&cr green:&cg blue:&cb alpha:&ca];
 
-    NSColor *topC, *botC, *strokeC;
+    NSColor *topColor, *bottomColor;
     if (dark) {
-        topC = [NSColor colorWithCalibratedRed:MIN(1.0, cr * 1.08)
-                                         green:MIN(1.0, cg * 1.08)
-                                          blue:MIN(1.0, cb * 1.08)
-                                         alpha:1.0];
-        botC = [NSColor colorWithCalibratedRed:MAX(0.0, cr * 0.68)
-                                         green:MAX(0.0, cg * 0.68)
-                                          blue:MAX(0.0, cb * 0.68)
-                                         alpha:1.0];
-        strokeC = [NSColor colorWithCalibratedRed:MIN(1.0, cr * 1.25)
-                                            green:MIN(1.0, cg * 1.25)
-                                             blue:MIN(1.0, cb * 1.25)
-                                            alpha:0.85];
+        topColor = [NSColor colorWithCalibratedRed:MIN(1.0, cr * 1.08)
+                                             green:MIN(1.0, cg * 1.08)
+                                              blue:MIN(1.0, cb * 1.08)
+                                             alpha:1.0];
+        bottomColor = [NSColor colorWithCalibratedRed:MAX(0.0, cr * 0.72)
+                                                green:MAX(0.0, cg * 0.72)
+                                                 blue:MAX(0.0, cb * 0.72)
+                                                alpha:1.0];
     } else {
-        topC = [NSColor colorWithCalibratedRed:MIN(1.0, cr * 1.15)
-                                         green:MIN(1.0, cg * 1.15)
-                                          blue:MIN(1.0, cb * 1.15)
-                                         alpha:1.0];
-        botC = [NSColor colorWithCalibratedRed:MAX(0.0, cr * 0.80)
-                                         green:MAX(0.0, cg * 0.80)
-                                          blue:MAX(0.0, cb * 0.80)
-                                         alpha:1.0];
-        strokeC = [NSColor colorWithCalibratedRed:MIN(1.0, cr * 1.28)
-                                            green:MIN(1.0, cg * 1.28)
-                                             blue:MIN(1.0, cb * 1.28)
-                                            alpha:0.95];
+        topColor = [NSColor colorWithCalibratedRed:MIN(1.0, cr * 1.12)
+                                             green:MIN(1.0, cg * 1.12)
+                                              blue:MIN(1.0, cb * 1.12)
+                                             alpha:1.0];
+        bottomColor = [NSColor colorWithCalibratedRed:MAX(0.0, cr * 0.82)
+                                                green:MAX(0.0, cg * 0.82)
+                                                 blue:MAX(0.0, cb * 0.82)
+                                                alpha:1.0];
     }
 
-    NSBezierPath *activePath = nil;
-    NPDrawTabPill(&activePath, activeRect, 6.0);
-    [[[NSGradient alloc] initWithStartingColor:topC endingColor:botC] drawInBezierPath:activePath angle:270];
-    [strokeC setStroke];
-    activePath.lineWidth = 1.0;
+    NSGradient *tabGrad = [[NSGradient alloc] initWithStartingColor:topColor endingColor:bottomColor];
+    [tabGrad drawInBezierPath:activePath angle:270];
+    [NSGraphicsContext restoreGraphicsState];
+
+    // Subtle inner border highlight
+    NSColor *activeBorder = [NSColor colorWithCalibratedWhite:1.0 alpha:dark ? 0.22 : 0.40];
+    [activeBorder setStroke];
+    activePath.lineWidth = 0.75;
     [activePath stroke];
 
-    // Disk icon
-    CGFloat dSz = 12.0;
-    CGFloat dX = activeRect.origin.x + 9.0;
-    CGFloat dY = activeRect.origin.y + (activeRect.size.height - dSz) / 2.0;
-    NSBezierPath *diskBd = [NSBezierPath bezierPathWithRoundedRect:NSMakeRect(dX, dY, dSz, dSz)
-                                                           xRadius:1.5
-                                                           yRadius:1.5];
-    [[NSColor colorWithCalibratedRed:0.30 green:0.58 blue:0.95 alpha:1.0] setStroke];
-    diskBd.lineWidth = 1.0;
-    [diskBd stroke];
-    NSBezierPath *shutBd = [NSBezierPath bezierPathWithRect:NSMakeRect(dX + 2.5, dY + dSz - 4.5, dSz - 5.0, 3.8)];
-    [[NSColor colorWithCalibratedWhite:0.88 alpha:1.0] setStroke];
-    shutBd.lineWidth = 0.8;
-    [shutBd stroke];
+    // Floppy disk icon
+    CGFloat diskSz = 11.0;
+    CGFloat diskX = activeRect.origin.x + 7.0;
+    CGFloat diskY = activeRect.origin.y + (tabH - diskSz) / 2.0;
+    NPDrawPreviewFloppy(NSMakeRect(diskX, diskY, diskSz, diskSz), dark, YES);
 
     // Title "new 1"
-    NSDictionary *wTitle = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:12.5 weight:NSFontWeightSemibold],
+    NSDictionary *titleA = @{
+        NSFontAttributeName: [NSFont systemFontOfSize:11.5 weight:NSFontWeightMedium],
         NSForegroundColorAttributeName: [NSColor whiteColor]
     };
-    NSAttributedString *ts = [[NSAttributedString alloc] initWithString:@"new 1" attributes:wTitle];
-    CGFloat titleY = activeRect.origin.y + (activeRect.size.height - [ts size].height) / 2.0;
-    [ts drawAtPoint:NSMakePoint(dX + dSz + 7.0, titleY)];
+    NSAttributedString *titleStr = [[NSAttributedString alloc] initWithString:@"new 1" attributes:titleA];
+    CGFloat titleY = activeRect.origin.y + (tabH - [titleStr size].height) / 2.0;
+    [titleStr drawAtPoint:NSMakePoint(diskX + diskSz + 6.0, titleY)];
 
-    // Close ✕
-    NSDictionary *xA = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:10.0 weight:NSFontWeightBold],
-        NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:1.0 alpha:0.85]
+    // Close button
+    NSRect closeRect = NSMakeRect(NSMaxX(activeRect) - 18.0, activeRect.origin.y + (tabH - 12.0) / 2.0, 12.0, 12.0);
+    NPDrawPreviewClose(closeRect, [NSColor whiteColor]);
+
+    // ─── Inactive Tab 1 ("new 2") ─────────────────────────────────────────
+    CGFloat inactW = 76.0;
+    NSRect inact1Rect = NSMakeRect(NSMaxX(activeRect) + 6.0, tabY, inactW, tabH);
+    NSBezierPath *inact1Path = [NSBezierPath bezierPathWithRoundedRect:inact1Rect xRadius:5.0 yRadius:5.0];
+
+    NSColor *inactBg = dark ? [NSColor colorWithCalibratedRed:0.15 green:0.155 blue:0.17 alpha:0.85]
+                            : [NSColor colorWithCalibratedWhite:0.87 alpha:0.85];
+    [inactBg setFill];
+    [inact1Path fill];
+
+    NSColor *inactBorder =
+        dark ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.08] : [NSColor colorWithCalibratedWhite:0.75 alpha:0.7];
+    [inactBorder setStroke];
+    inact1Path.lineWidth = 0.75;
+    [inact1Path stroke];
+
+    CGFloat inactDiskX = inact1Rect.origin.x + 6.0;
+    CGFloat inactDiskY = inact1Rect.origin.y + (tabH - diskSz) / 2.0;
+    NPDrawPreviewFloppy(NSMakeRect(inactDiskX, inactDiskY, diskSz, diskSz), dark, NO);
+
+    NSDictionary *inactA = @{
+        NSFontAttributeName: [NSFont systemFontOfSize:11.5 weight:NSFontWeightRegular],
+        NSForegroundColorAttributeName: dark ? [NSColor colorWithCalibratedWhite:0.76 alpha:1.0]
+                                             : [NSColor colorWithCalibratedWhite:0.25 alpha:1.0]
     };
-    NSAttributedString *xs = [[NSAttributedString alloc] initWithString:@"✕" attributes:xA];
-    CGFloat xX = NSMaxX(activeRect) - [xs size].width - 8.0;
-    [xs drawAtPoint:NSMakePoint(xX, titleY)];
+    NSAttributedString *inactStr1 = [[NSAttributedString alloc] initWithString:@"new 2" attributes:inactA];
+    [inactStr1 drawAtPoint:NSMakePoint(inactDiskX + diskSz + 5.0, titleY)];
 
-    // ─── Inactive Tab 1 "new 2" ──────────────────────────────────────────
-    CGFloat inactW = 98.0;
-    NSRect inact1Rect = NSMakeRect(NSMaxX(activeRect) + 3.0, tabY, inactW, tabH);
-    NSBezierPath *inact1 = nil;
-    NPDrawTabPill(&inact1, inact1Rect, 6.0);
+    // ─── Inactive Tab 2 ("new 3") ─────────────────────────────────────────
+    NSRect inact2Rect = NSMakeRect(NSMaxX(inact1Rect) + 6.0, tabY, inactW, tabH);
+    NSBezierPath *inact2Path = [NSBezierPath bezierPathWithRoundedRect:inact2Rect xRadius:5.0 yRadius:5.0];
+    [inactBg setFill];
+    [inact2Path fill];
+    [inactBorder setStroke];
+    inact2Path.lineWidth = 0.75;
+    [inact2Path stroke];
 
-    NSColor *iBg = dark ? [NSColor colorWithCalibratedRed:0.13 green:0.135 blue:0.155 alpha:1.0]
-                        : [NSColor colorWithCalibratedWhite:0.86 alpha:1.0];
-    [iBg setFill];
-    [inact1 fill];
-    NSColor *iBrd = dark ? [NSColor colorWithCalibratedRed:0.22 green:0.23 blue:0.26 alpha:1.0]
-                         : [NSColor colorWithCalibratedWhite:0.76 alpha:1.0];
-    [iBrd setStroke];
-    inact1.lineWidth = 1.0;
-    [inact1 stroke];
+    CGFloat inact2DiskX = inact2Rect.origin.x + 6.0;
+    NPDrawPreviewFloppy(NSMakeRect(inact2DiskX, inactDiskY, diskSz, diskSz), dark, NO);
 
-    NSDictionary *iA = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:12.0 weight:NSFontWeightRegular],
-        NSForegroundColorAttributeName: dark ? [NSColor colorWithCalibratedWhite:0.68 alpha:1.0]
-                                             : [NSColor colorWithCalibratedWhite:0.28 alpha:1.0]
-    };
-    [[[NSAttributedString alloc] initWithString:@"new 2"
-                                     attributes:iA] drawAtPoint:NSMakePoint(inact1Rect.origin.x + 12.0, titleY)];
+    NSAttributedString *inactStr2 = [[NSAttributedString alloc] initWithString:@"new 3" attributes:inactA];
+    [inactStr2 drawAtPoint:NSMakePoint(inact2DiskX + diskSz + 5.0, titleY)];
 
-    // ─── Inactive Tab 2 "new 3" ──────────────────────────────────────────
-    NSRect inact2Rect = NSMakeRect(NSMaxX(inact1Rect) + 3.0, tabY, inactW, tabH);
-    NSBezierPath *inact2 = nil;
-    NPDrawTabPill(&inact2, inact2Rect, 6.0);
-    [iBg setFill];
-    [inact2 fill];
-    [iBrd setStroke];
-    inact2.lineWidth = 1.0;
-    [inact2 stroke];
-    [[[NSAttributedString alloc] initWithString:@"new 3"
-                                     attributes:iA] drawAtPoint:NSMakePoint(inact2Rect.origin.x + 12.0, titleY)];
-
-    // ─── "+" New Tab Button ───────────────────────────────────────────────
-    NSDictionary *plusA = @{
-        NSFontAttributeName: [NSFont systemFontOfSize:15.0 weight:NSFontWeightMedium],
-        NSForegroundColorAttributeName: dark ? [NSColor colorWithCalibratedWhite:0.55 alpha:1.0]
-                                             : [NSColor colorWithCalibratedWhite:0.40 alpha:1.0]
-    };
-    [[[NSAttributedString alloc] initWithString:@"+"
-                                     attributes:plusA] drawAtPoint:NSMakePoint(NSMaxX(inact2Rect) + 10.0, titleY)];
+    // ─── Plus Button ("+") ────────────────────────────────────────────────
+    NSRect plusRect = NSMakeRect(NSMaxX(inact2Rect) + 8.0, activeRect.origin.y + (tabH - 16.0) / 2.0, 16.0, 16.0);
+    NSColor *plusColor =
+        dark ? [NSColor colorWithCalibratedWhite:0.68 alpha:1.0] : [NSColor colorWithCalibratedWhite:0.38 alpha:1.0];
+    NPDrawPreviewPlus(plusRect, plusColor);
 }
 
 @end
@@ -400,7 +500,6 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
 @property (nonatomic, strong) NSView *generalView;
 @property (nonatomic, strong) NSView *editorView;
 @property (nonatomic, strong) NSView *themeView;
-@property (nonatomic, strong) NSView *encodingView;
 @property (nonatomic, strong) NSView *backupView;
 
 // General Controls
@@ -423,10 +522,9 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
 @property (nonatomic, strong) NSButton *useSpacesCheckbox;
 
 // Theme Controls
-@property (nonatomic, strong) NSSegmentedControl *themeSegmentedControl;
-
-// Encoding Controls
-@property (nonatomic, strong) NSPopUpButton *encodingPopup;
+@property (nonatomic, strong) NSButton *lightThemeRadio;
+@property (nonatomic, strong) NSButton *darkThemeRadio;
+@property (nonatomic, strong) NSButton *systemThemeRadio;
 
 // Backup & Advanced Controls
 @property (nonatomic, strong) NSButton *backupOnSaveCheckbox;
@@ -434,6 +532,7 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
 
 // Tracked labels & boxes for dynamic Light / Dark mode updates
 @property (nonatomic, strong) NSMutableArray<NSBox *> *cardBoxes;
+@property (nonatomic, strong) NSMutableArray<NSBox *> *separators;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *cardHeaderLabels;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *fieldLabels;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *secondaryLabels;
@@ -465,6 +564,7 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
         window.delegate = self;
 
         _cardBoxes = [NSMutableArray array];
+        _separators = [NSMutableArray array];
         _cardHeaderLabels = [NSMutableArray array];
         _fieldLabels = [NSMutableArray array];
         _secondaryLabels = [NSMutableArray array];
@@ -473,7 +573,6 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
             [NPCategoryItem itemWithTitle:@"General" icon:NSImageNamePreferencesGeneral symbol:@"gearshape"],
             [NPCategoryItem itemWithTitle:@"Editor" icon:NSImageNameMultipleDocuments symbol:@"doc.text"],
             [NPCategoryItem itemWithTitle:@"Dark Mode" icon:NSImageNameColorPanel symbol:@"moon.fill"],
-            [NPCategoryItem itemWithTitle:@"New Document" icon:NSImageNameFolder symbol:@"character.book.closed"],
             [NPCategoryItem itemWithTitle:@"Backup" icon:NSImageNameAdvanced symbol:@"archivebox"]
         ];
 
@@ -518,9 +617,14 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
 }
 
 - (NSColor *)cardBorderColor {
-    return [self isDark] ? [NSColor colorWithCalibratedRed:0.20 green:0.20 blue:0.23 alpha:1.0]
-                         :                                         // Subtle border #33333B
-               [NSColor colorWithCalibratedWhite:0.80 alpha:1.0];  // Light border #CCCCCC
+    return [self isDark] ? [NSColor colorWithCalibratedRed:0.22 green:0.22 blue:0.25 alpha:1.0]
+                         :                                         // Subtle border #383840
+               [NSColor colorWithCalibratedWhite:0.72 alpha:1.0];  // Crisp defined border in Light mode
+}
+
+- (NSColor *)separatorColor {
+    return [self isDark] ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.08]
+                         : [NSColor colorWithCalibratedWhite:0.0 alpha:0.10];
 }
 
 - (NSColor *)previewBgColor {
@@ -581,6 +685,11 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
         box.borderColor = cardBorder;
     }
 
+    NSColor *sepColor = [self separatorColor];
+    for (NSBox *sep in self.separators) {
+        sep.fillColor = sepColor;
+    }
+
     NSColor *priColor = [self primaryTextColor];
     for (NSTextField *label in self.cardHeaderLabels) {
         label.textColor = priColor;
@@ -603,10 +712,17 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
         self.previewScrollView.layer.borderWidth = 1.0;
     }
 
-    if (self.tabColorPreviewView) {
-        self.tabColorPreviewView.isDark = [self isDark];
+    if (self.tabColorSwatchRow) {
+        self.tabColorSwatchRow.isDark = [self isDark];
+        [self.tabColorSwatchRow setNeedsDisplay:YES];
     }
 
+    if (self.tabColorPreviewView) {
+        self.tabColorPreviewView.isDark = [self isDark];
+        [self.tabColorPreviewView setNeedsDisplay:YES];
+    }
+
+    [self updateThemeRadioStates];
     [self updateFontPreview];
     [self.tableView reloadData];
 }
@@ -668,11 +784,10 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     self.closeButton.keyEquivalent = @"\r";
     [contentView addSubview:self.closeButton];
 
-    // Build the 5 Category Views with ample widths & vertical breathing space
+    // Build the Category Views with ample widths & vertical breathing space
     [self buildGeneralView:NSMakeRect(0, 0, detailWidth, mainHeight)];
     [self buildEditorView:NSMakeRect(0, 0, detailWidth, mainHeight)];
     [self buildThemeView:NSMakeRect(0, 0, detailWidth, mainHeight)];
-    //   [self buildEncodingView:NSMakeRect(0, 0, detailWidth, mainHeight)];
     [self buildBackupView:NSMakeRect(0, 0, detailWidth, mainHeight)];
 
     // Select initial row (General)
@@ -700,6 +815,15 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     [self.cardBoxes addObject:box];
     [self.cardHeaderLabels addObject:titleLabel];
     return box;
+}
+
+- (NSBox *)makeSeparatorWithFrame:(NSRect)frame {
+    NSBox *sep = [[NSBox alloc] initWithFrame:frame];
+    sep.boxType = NSBoxCustom;
+    sep.borderWidth = 0.0;
+    sep.fillColor = [self separatorColor];
+    [self.separators addObject:sep];
+    return sep;
 }
 
 - (NSTextField *)makeFieldLabel:(NSString *)text frame:(NSRect)frame {
@@ -734,8 +858,8 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
 
     CGFloat cardWidth = bounds.size.width - 48;
 
-    // Card 1: Interface & View (Height 135)
-    CGFloat interfaceCardHeight = 135;
+    // Card 1: Interface & View (Height 120)
+    CGFloat interfaceCardHeight = 120;
     CGFloat interfaceCardY = bounds.size.height - interfaceCardHeight - 16;
     NSBox *interfaceCard = [self createCardWithTitle:@"Interface & View"
                                                frame:NSMakeRect(24, interfaceCardY, cardWidth, interfaceCardHeight)];
@@ -744,38 +868,36 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
                                                       target:self
                                                       action:@selector(statusBarToggled:)];
     self.showStatusBarCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
-    self.showStatusBarCheckbox.frame = NSMakeRect(24, 72, cardWidth - 48, 24);
+    self.showStatusBarCheckbox.frame = NSMakeRect(22, 62, cardWidth - 44, 22);
     [interfaceCard addSubview:self.showStatusBarCheckbox];
 
     self.showLineNumbersCheckbox = [NSButton checkboxWithTitle:@"Show line numbers gutter"
                                                         target:self
                                                         action:@selector(lineNumbersToggled:)];
     self.showLineNumbersCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
-    self.showLineNumbersCheckbox.frame = NSMakeRect(24, 42, cardWidth - 48, 24);
+    self.showLineNumbersCheckbox.frame = NSMakeRect(22, 36, cardWidth - 44, 22);
     [interfaceCard addSubview:self.showLineNumbersCheckbox];
 
     self.wordWrapCheckbox = [NSButton checkboxWithTitle:@"Word wrap by default"
                                                  target:self
                                                  action:@selector(wordWrapToggled:)];
     self.wordWrapCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
-    self.wordWrapCheckbox.frame = NSMakeRect(24, 12, cardWidth - 48, 24);
+    self.wordWrapCheckbox.frame = NSMakeRect(22, 10, cardWidth - 44, 22);
     [interfaceCard addSubview:self.wordWrapCheckbox];
 
     [self.generalView addSubview:interfaceCard];
 
-    // Card 2: Tab Color & Appearance — redesigned with swatch circles (Height
-    // 330)
-    CGFloat tabCardHeight = 330;
+    // Card 2: Tab Color & Style (Height 320)
+    CGFloat tabCardHeight = 320;
     CGFloat tabCardY = interfaceCardY - 16 - tabCardHeight;
     NSBox *tabCard = [self createCardWithTitle:@"Tab Color & Style"
                                          frame:NSMakeRect(24, tabCardY, cardWidth, tabCardHeight)];
 
     // ── Row: "Preset Colors:" label ──────────────────────────────────────────
-    NSTextField *colorLabel = [self makeFieldLabel:@"Preset Colors:" frame:NSMakeRect(24, 272, 110, 20)];
+    NSTextField *colorLabel = [self makeFieldLabel:@"Preset Colors:" frame:NSMakeRect(22, 258, 140, 18)];
     [tabCard addSubview:colorLabel];
 
     // ── Row: NPColorSwatchRowView ─────────────────────────────────────────────
-    // 10 presets + "+" custom circle
     NSArray<NSDictionary *> *presets = [PreferencesManager presetTabColors];
     NSMutableArray<NSColor *> *swatchColors = [NSMutableArray array];
     for (NSDictionary *p in presets) {
@@ -788,10 +910,11 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     [self populateTabColorPresets];
     [tabCard addSubview:self.tabColorPresetPopup];
 
-    CGFloat swatchRowH = 46.0;
-    CGFloat swatchRowW = cardWidth - 48;
-    self.tabColorSwatchRow = [[NPColorSwatchRowView alloc] initWithFrame:NSMakeRect(24, 222, swatchRowW, swatchRowH)];
+    CGFloat swatchRowH = 36.0;
+    CGFloat swatchRowW = cardWidth - 44;
+    self.tabColorSwatchRow = [[NPColorSwatchRowView alloc] initWithFrame:NSMakeRect(22, 216, swatchRowW, swatchRowH)];
     self.tabColorSwatchRow.swatchColors = swatchColors;
+    self.tabColorSwatchRow.isDark = [self isDark];
 
     __weak PreferencesWindowController *wSelf = self;
     self.tabColorSwatchRow.onSelectIndex = ^(NSInteger idx) {
@@ -811,27 +934,25 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     };
     [tabCard addSubview:self.tabColorSwatchRow];
 
-    // ── Separator ──────────────────────────────────────────────────────────────
-    NSBox *sep1 = [[NSBox alloc] initWithFrame:NSMakeRect(24, 214, cardWidth - 48, 1)];
-    sep1.boxType = NSBoxSeparator;
+    // ── Separator 1 ────────────────────────────────────────────────────────────
+    NSBox *sep1 = [self makeSeparatorWithFrame:NSMakeRect(22, 206, cardWidth - 44, 1)];
     [tabCard addSubview:sep1];
 
-    // ── Row: Color Well + 🎲 Random button ───────────────────────────────────
-    // Color well (hidden well, only activates when custom swatch clicked)
-    self.tabColorWell = [[NSColorWell alloc] initWithFrame:NSMakeRect(24, 180, 32, 28)];
+    // ── Row: Color Well + "Custom" + 🎲 Random button ─────────────────────────
+    self.tabColorWell = [[NSColorWell alloc] initWithFrame:NSMakeRect(22, 169, 36, 26)];
     self.tabColorWell.target = self;
     self.tabColorWell.action = @selector(tabColorWellChanged:);
     [tabCard addSubview:self.tabColorWell];
 
-    NSTextField *wellLabel = [self makeDescriptionLabel:@"Custom" frame:NSMakeRect(60, 184, 52, 18)];
+    NSTextField *wellLabel = [self makeDescriptionLabel:@"Custom" frame:NSMakeRect(66, 173, 80, 18)];
     [tabCard addSubview:wellLabel];
 
     self.randomColorButton = [NSButton buttonWithTitle:@"🎲  Random Color"
                                                 target:self
                                                 action:@selector(randomColorButtonClicked:)];
     self.randomColorButton.bezelStyle = NSBezelStyleRounded;
-    self.randomColorButton.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightMedium];
-    self.randomColorButton.frame = NSMakeRect(cardWidth - 48 - 148, 178, 148, 30);
+    self.randomColorButton.font = [NSFont systemFontOfSize:12.5 weight:NSFontWeightMedium];
+    self.randomColorButton.frame = NSMakeRect(cardWidth - 22 - 146, 166, 146, 28);
     [tabCard addSubview:self.randomColorButton];
 
     // ── Checkbox: Assign random ───────────────────────────────────────────────
@@ -839,20 +960,19 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
                                                            target:self
                                                            action:@selector(randomTabColorsToggled:)];
     self.useRandomTabColorsCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
-    self.useRandomTabColorsCheckbox.frame = NSMakeRect(24, 148, cardWidth - 48, 24);
+    self.useRandomTabColorsCheckbox.frame = NSMakeRect(22, 134, cardWidth - 44, 22);
     [tabCard addSubview:self.useRandomTabColorsCheckbox];
 
-    // ── Separator ──────────────────────────────────────────────────────────────
-    NSBox *sep2 = [[NSBox alloc] initWithFrame:NSMakeRect(24, 140, cardWidth - 48, 1)];
-    sep2.boxType = NSBoxSeparator;
+    // ── Separator 2 ────────────────────────────────────────────────────────────
+    NSBox *sep2 = [self makeSeparatorWithFrame:NSMakeRect(22, 124, cardWidth - 44, 1)];
     [tabCard addSubview:sep2];
 
     // ── Live Preview label ────────────────────────────────────────────────────
-    NSTextField *previewTitle = [self makeFieldLabel:@"Live Preview:" frame:NSMakeRect(24, 120, 120, 20)];
+    NSTextField *previewTitle = [self makeFieldLabel:@"Live Preview:" frame:NSMakeRect(22, 98, 120, 18)];
     [tabCard addSubview:previewTitle];
 
-    // ── Preview view (3 tabs) ─────────────────────────────────────────────────
-    self.tabColorPreviewView = [[NPTabColorPreviewView alloc] initWithFrame:NSMakeRect(24, 52, cardWidth - 48, 62)];
+    // ── Preview view (Floating Pills) ─────────────────────────────────────────
+    self.tabColorPreviewView = [[NPTabColorPreviewView alloc] initWithFrame:NSMakeRect(22, 50, cardWidth - 44, 40)];
     self.tabColorPreviewView.baseColor = [[PreferencesManager sharedManager] activeTabColor];
     self.tabColorPreviewView.isDark = [self isDark];
     [tabCard addSubview:self.tabColorPreviewView];
@@ -862,7 +982,7 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
         [self makeDescriptionLabel:@"Click a preset swatch to apply instantly, or tap + to pick a "
                                    @"custom color. Roll 🎲 for a random vibrant color that "
                                    @"generates depth gradients dynamically."
-                             frame:NSMakeRect(24, 12, cardWidth - 48, 36)];
+                             frame:NSMakeRect(22, 12, cardWidth - 44, 32)];
     [tabCard addSubview:tabHintLabel];
 
     [self.generalView addSubview:tabCard];
@@ -887,6 +1007,7 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     self.tabColorWell.color = activeColor;
     self.tabColorPreviewView.baseColor = activeColor;
     self.tabColorPreviewView.isDark = [self isDark];
+    self.tabColorSwatchRow.isDark = [self isDark];
     self.useRandomTabColorsCheckbox.state = prefs.useRandomTabColors ? NSControlStateValueOn : NSControlStateValueOff;
 
     // Sync swatch row selection
@@ -1022,69 +1143,38 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     self.themeView = [[NSView alloc] initWithFrame:bounds];
 
     CGFloat cardWidth = bounds.size.width - 48;
-    CGFloat cardHeight = 245;
+    CGFloat cardHeight = 135;
     CGFloat cardY = bounds.size.height - cardHeight - 24;
 
     NSBox *themeCard = [self createCardWithTitle:@"Color Theme" frame:NSMakeRect(24, cardY, cardWidth, cardHeight)];
 
-    NSTextField *themeLabel = [self makeFieldLabel:@"Mode:" frame:NSMakeRect(24, 156, 50, 22)];
+    NSTextField *themeLabel = [self makeFieldLabel:@"Mode:" frame:NSMakeRect(24, 68, 50, 22)];
     [themeCard addSubview:themeLabel];
 
-    self.themeSegmentedControl = [NSSegmentedControl segmentedControlWithLabels:@[@"Light", @"Dark", @"System Default"]
-                                                                   trackingMode:NSSegmentSwitchTrackingSelectOne
-                                                                         target:self
-                                                                         action:@selector(themeChanged:)];
-    self.themeSegmentedControl.frame = NSMakeRect(78, 152, 380, 30);
-    [themeCard addSubview:self.themeSegmentedControl];
+    self.lightThemeRadio = [NSButton radioButtonWithTitle:@"Light" target:self action:@selector(themeRadioChanged:)];
+    self.lightThemeRadio.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.lightThemeRadio.frame = NSMakeRect(80, 68, 75, 22);
+    [themeCard addSubview:self.lightThemeRadio];
+
+    self.darkThemeRadio = [NSButton radioButtonWithTitle:@"Dark" target:self action:@selector(themeRadioChanged:)];
+    self.darkThemeRadio.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.darkThemeRadio.frame = NSMakeRect(170, 68, 75, 22);
+    [themeCard addSubview:self.darkThemeRadio];
+
+    self.systemThemeRadio = [NSButton radioButtonWithTitle:@"System Default"
+                                                    target:self
+                                                    action:@selector(themeRadioChanged:)];
+    self.systemThemeRadio.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.systemThemeRadio.frame = NSMakeRect(260, 68, 140, 22);
+    [themeCard addSubview:self.systemThemeRadio];
+
+    NSString *descText =
+        @"Choose Light or Dark appearance, or choose System Default to automatically follow macOS system settings.";
+    NSTextField *descLabel = [self makeDescriptionLabel:descText frame:NSMakeRect(24, 22, cardWidth - 48, 36)];
+    [themeCard addSubview:descLabel];
 
     [self.themeView addSubview:themeCard];
 }
-
-// 4. New Document & Encoding View
-// - (void)buildEncodingView:(NSRect)bounds {
-//   self.encodingView = [[NSView alloc] initWithFrame:bounds];
-
-//   CGFloat cardWidth = bounds.size.width - 48;
-//   CGFloat cardHeight = 245;
-//   CGFloat cardY = bounds.size.height - cardHeight - 24;
-
-//   NSBox *encCard =
-//       [self createCardWithTitle:@"New Document & Default Encoding"
-//                           frame:NSMakeRect(24, cardY, cardWidth, cardHeight)];
-
-//   NSTextField *encLabel = [self makeFieldLabel:@"Encoding:"
-//                                          frame:NSMakeRect(24, 156, 75, 22)];
-//   [encCard addSubview:encLabel];
-
-//   self.encodingPopup =
-//       [[NSPopUpButton alloc] initWithFrame:NSMakeRect(105, 153, 310, 28)
-//                                  pullsDown:NO];
-//   for (NSDictionary *item in [PreferencesManager supportedEncodings]) {
-//     [self.encodingPopup addItemWithTitle:item[@"name"]];
-//     [self.encodingPopup lastItem].tag = [item[@"encoding"] integerValue];
-//   }
-//   self.encodingPopup.target = self;
-//   self.encodingPopup.action = @selector(encodingChanged:);
-//   [encCard addSubview:self.encodingPopup];
-
-//   NSString *noteText =
-//       @"• New Documents & Live Synchronization:\n"
-//       @"  This character encoding is applied when creating new untitled "
-//       @"documents.\n"
-//       @"  Changing it here will immediately synchronize with the active status "
-//       @"bar footer.\n\n"
-//       @"• Fallback Decoding:\n"
-//       @"  Also utilized as the preferred decoding format when opening legacy "
-//       @"text files\n"
-//       @"  that do not contain an explicit Byte Order Mark (BOM).";
-
-//   NSTextField *noteLabel =
-//       [self makeDescriptionLabel:noteText
-//                            frame:NSMakeRect(24, 20, cardWidth - 48, 115)];
-//   [encCard addSubview:noteLabel];
-
-//   [self.encodingView addSubview:encCard];
-// }
 
 // 5. Backup & Advanced View
 - (void)buildBackupView:(NSRect)bounds {
@@ -1234,9 +1324,6 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
         targetView = self.themeView;
         break;
     case 3:
-        targetView = self.encodingView;
-        break;
-    case 4:
         targetView = self.backupView;
         break;
     default:
@@ -1280,15 +1367,7 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     self.useSpacesCheckbox.state = prefs.useSpaces ? NSControlStateValueOn : NSControlStateValueOff;
 
     // Theme
-    NSInteger segment = 2;  // System default
-    if (prefs.themeMode == NPThemeModeLight)
-        segment = 0;
-    else if (prefs.themeMode == NPThemeModeDark)
-        segment = 1;
-    self.themeSegmentedControl.selectedSegment = segment;
-
-    // Encoding
-    [self.encodingPopup selectItemWithTag:prefs.defaultEncoding];
+    [self updateThemeRadioStates];
 
     // Backup & Advanced
     self.backupOnSaveCheckbox.state = prefs.backupOnSave ? NSControlStateValueOn : NSControlStateValueOff;
@@ -1359,16 +1438,24 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
     [prefs savePreferences];
 }
 
-- (void)themeChanged:(id)sender {
+- (void)updateThemeRadioStates {
     PreferencesManager *prefs = [PreferencesManager sharedManager];
-    NSInteger seg = self.themeSegmentedControl.selectedSegment;
-    if (seg == 0) {
+    self.lightThemeRadio.state = (prefs.themeMode == NPThemeModeLight) ? NSControlStateValueOn : NSControlStateValueOff;
+    self.darkThemeRadio.state = (prefs.themeMode == NPThemeModeDark) ? NSControlStateValueOn : NSControlStateValueOff;
+    self.systemThemeRadio.state =
+        (prefs.themeMode == NPThemeModeSystem) ? NSControlStateValueOn : NSControlStateValueOff;
+}
+
+- (void)themeRadioChanged:(id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    if (sender == self.lightThemeRadio) {
         prefs.themeMode = NPThemeModeLight;
-    } else if (seg == 1) {
+    } else if (sender == self.darkThemeRadio) {
         prefs.themeMode = NPThemeModeDark;
-    } else {
+    } else if (sender == self.systemThemeRadio) {
         prefs.themeMode = NPThemeModeSystem;
     }
+    [self updateThemeRadioStates];
     [prefs savePreferences];
     [self applyThemeColors];
 }
@@ -1419,12 +1506,6 @@ static void NPDrawTabPill(NSBezierPath **outPath, NSRect rect, CGFloat radius) {
 - (void)randomTabColorsToggled:(id)sender {
     PreferencesManager *prefs = [PreferencesManager sharedManager];
     prefs.useRandomTabColors = (self.useRandomTabColorsCheckbox.state == NSControlStateValueOn);
-    [prefs savePreferences];
-}
-
-- (void)encodingChanged:(id)sender {
-    PreferencesManager *prefs = [PreferencesManager sharedManager];
-    prefs.defaultEncoding = (NSStringEncoding)self.encodingPopup.selectedTag;
     [prefs savePreferences];
 }
 
