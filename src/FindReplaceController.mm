@@ -197,6 +197,17 @@ static const int kCurrentMatchIndicator = 29;
 #pragma mark - NSTextFieldDelegate
 
 - (void)controlTextDidChange:(NSNotification *)obj {
+    [NSObject cancelPreviousPerformRequestsWithTarget:self selector:@selector(debouncedSearch) object:nil];
+    long docLength = self.editor ? [self.editor message:SCI_GETLENGTH] : 0;
+    if (docLength > 5 * 1024 * 1024) {
+        // Debounce by 250ms on large documents
+        [self performSelector:@selector(debouncedSearch) withObject:nil afterDelay:0.25];
+    } else {
+        [self debouncedSearch];
+    }
+}
+
+- (void)debouncedSearch {
     [self updateMatchesAndHighlight:YES];
 }
 
@@ -374,6 +385,15 @@ static const int kCurrentMatchIndicator = 29;
         return;
     }
 
+    // For documents > 10MB, require at least 2 characters before running full-document scan
+    if (docLength > 10 * 1024 * 1024 && query.length < 2) {
+        _statusLabel.stringValue = @"Enter at least 2 characters to search";
+        _cachedMatches = @[];
+        _currentMatchIndex = -1;
+        [self clearHighlights];
+        return;
+    }
+
     // Save target range & search flags before scanning
     long origTargetStart = [self.editor getGeneralProperty:SCI_GETTARGETSTART];
     long origTargetEnd = [self.editor getGeneralProperty:SCI_GETTARGETEND];
@@ -385,8 +405,9 @@ static const int kCurrentMatchIndicator = 29;
     const char *utf8Query = [query UTF8String];
     long queryLen = strlen(utf8Query);
     long searchPos = 0;
+    const NSUInteger maxMatches = (docLength > 20 * 1024 * 1024) ? 1000 : 5000;
 
-    while (searchPos < docLength && matches.count < 5000) {
+    while (searchPos < docLength && matches.count < maxMatches) {
         [self.editor message:SCI_SETTARGETSTART wParam:searchPos lParam:0];
         [self.editor message:SCI_SETTARGETEND wParam:docLength lParam:0];
 
@@ -722,11 +743,20 @@ static const int kCurrentMatchIndicator = 29;
         long selStart = [self.editor getGeneralProperty:SCI_GETSELECTIONSTART];
         long selEnd = [self.editor getGeneralProperty:SCI_GETSELECTIONEND];
         NSInteger newIndex = -1;
-        for (NSInteger i = 0; i < (NSInteger)_cachedMatches.count; i++) {
-            NSRange r = [_cachedMatches[i] rangeValue];
+
+        // Binary search since _cachedMatches is strictly sorted in ascending document order
+        NSInteger low = 0;
+        NSInteger high = (NSInteger)_cachedMatches.count - 1;
+        while (low <= high) {
+            NSInteger mid = low + (high - low) / 2;
+            NSRange r = [_cachedMatches[mid] rangeValue];
             if ((long)r.location == selStart && (long)(r.location + r.length) == selEnd) {
-                newIndex = i;
+                newIndex = mid;
                 break;
+            } else if ((long)r.location < selStart) {
+                low = mid + 1;
+            } else {
+                high = mid - 1;
             }
         }
         if (newIndex != _currentMatchIndex) {

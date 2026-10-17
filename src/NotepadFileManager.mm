@@ -35,65 +35,83 @@
     }
 }
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/stat.h>
+
 - (void)openFileAtPath:(NSString *)path inController:(nullable NotepadWindowController *)controller {
-    NSData *data = [NSData dataWithContentsOfFile:path];
+    NSError *readError = nil;
+    NSData *data = [NSData dataWithContentsOfFile:path options:NSDataReadingMappedIfSafe error:&readError];
     if (!data) {
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = @"Could not open file";
         alert.informativeText =
-            [NSString stringWithFormat:@"The file \"%@\" could not be read.", [path lastPathComponent]];
+            [NSString stringWithFormat:@"The file \"%@\" could not be read: %@", [path lastPathComponent],
+                                       readError.localizedDescription ?: @"Unknown error"];
         [alert runModal];
         return;
     }
 
     NSStringEncoding detectedEncoding = NSUTF8StringEncoding;
-    NSString *content = nil;
-
-    // 1. Check Byte Order Marks (BOM)
     const uint8_t *bytes = (const uint8_t *)data.bytes;
     NSUInteger length = data.length;
+    size_t contentOffset = 0;
+    BOOL isDirectUTF8 = NO;
+    NSData *convertedUTF8Data = nil;
 
-    if (length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
+    // 1. Check Byte Order Marks (BOM)
+    if (length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
+        detectedEncoding = NSUTF8StringEncoding;
+        contentOffset = 3;
+        isDirectUTF8 = YES;
+    } else if (length >= 2 && bytes[0] == 0xFF && bytes[1] == 0xFE) {
         detectedEncoding = NSUTF16LittleEndianStringEncoding;
-        content = [[NSString alloc] initWithData:data encoding:detectedEncoding];
+        contentOffset = 2;
     } else if (length >= 2 && bytes[0] == 0xFE && bytes[1] == 0xFF) {
         detectedEncoding = NSUTF16BigEndianStringEncoding;
-        content = [[NSString alloc] initWithData:data encoding:detectedEncoding];
-    } else if (length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF) {
-        detectedEncoding = NSUTF8StringEncoding;
-        content = [[NSString alloc] initWithData:data encoding:detectedEncoding];
+        contentOffset = 2;
     }
 
-    // 2. Try UTF-8 without BOM first (standard modern text format)
-    if (!content) {
-        content = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
-        if (content) {
+    // 2. If no BOM, test UTF-8 without copy (in-place zero-copy validation)
+    if (contentOffset == 0) {
+        NSString *utf8Test = [[NSString alloc] initWithBytesNoCopy:(void *)bytes
+                                                            length:length
+                                                          encoding:NSUTF8StringEncoding
+                                                      freeWhenDone:NO];
+        if (utf8Test) {
             detectedEncoding = NSUTF8StringEncoding;
+            isDirectUTF8 = YES;
         }
     }
 
-    // 3. Try preferred default encoding if UTF-8 was not valid
-    NSStringEncoding preferredEncoding = [PreferencesManager sharedManager].defaultEncoding;
-    if (!content && preferredEncoding != NSUTF8StringEncoding) {
-        content = [[NSString alloc] initWithData:data encoding:preferredEncoding];
-        if (content) {
-            detectedEncoding = preferredEncoding;
+    // 3. Fallback to preferred or legacy encodings if not valid UTF-8
+    if (!isDirectUTF8) {
+        NSString *convertedString = nil;
+        NSStringEncoding preferredEncoding = [PreferencesManager sharedManager].defaultEncoding;
+        if (preferredEncoding != NSUTF8StringEncoding) {
+            convertedString = [[NSString alloc] initWithBytes:(bytes + contentOffset)
+                                                       length:(length - contentOffset)
+                                                     encoding:preferredEncoding];
+            if (convertedString) {
+                detectedEncoding = preferredEncoding;
+            }
         }
-    }
-
-    // 4. Fallback to Windows-1252 / ANSI / ISO Latin 1
-    if (!content) {
-        content = [[NSString alloc] initWithData:data encoding:NSWindowsCP1252StringEncoding];
-        if (content) {
-            detectedEncoding = NSWindowsCP1252StringEncoding;
-        } else {
-            content = [[NSString alloc] initWithData:data encoding:NSISOLatin1StringEncoding];
-            detectedEncoding = NSISOLatin1StringEncoding;
+        if (!convertedString) {
+            convertedString = [[NSString alloc] initWithBytes:(bytes + contentOffset)
+                                                       length:(length - contentOffset)
+                                                     encoding:NSWindowsCP1252StringEncoding];
+            if (convertedString) {
+                detectedEncoding = NSWindowsCP1252StringEncoding;
+            } else {
+                convertedString = [[NSString alloc] initWithBytes:(bytes + contentOffset)
+                                                           length:(length - contentOffset)
+                                                         encoding:NSISOLatin1StringEncoding];
+                detectedEncoding = NSISOLatin1StringEncoding;
+            }
         }
-    }
-
-    if (!content) {
-        content = @"";
+        if (convertedString) {
+            convertedUTF8Data = [convertedString dataUsingEncoding:NSUTF8StringEncoding];
+        }
     }
 
     // Determine target controller: reuse existing window or find active one
@@ -108,7 +126,6 @@
         }
     }
 
-    BOOL canReuse = NO;
     if (targetWC) {
         // If file is already open in a tab, simply switch to that tab
         for (NSInteger i = 0; i < (NSInteger)targetWC.tabs.count; i++) {
@@ -119,17 +136,14 @@
         }
 
         // If active tab is empty and unmodified, reuse it
-        if (targetWC.filePath == nil && !targetWC.isDirty && [targetWC.editor np_text].length == 0) {
-            canReuse = YES;
+        if (targetWC.filePath == nil && !targetWC.isDirty && [targetWC.editor message:SCI_GETLENGTH] == 0) {
+            // Reuse active tab
         } else {
             // Otherwise open a new tab in this same window!
-            [targetWC addNewTabWithFilePath:nil];
-            canReuse = YES;
+            [targetWC addNewTabWithFilePath:path];
         }
-    }
-
-    if (!targetWC) {
-        targetWC = [[NotepadWindowController alloc] initWithFilePath:nil];
+    } else {
+        targetWC = [[NotepadWindowController alloc] initWithFilePath:path];
         AppDelegate *appDelegate = (AppDelegate *)[NSApp delegate];
         [appDelegate addWindowController:targetWC];
         [targetWC showWindow:nil];
@@ -137,19 +151,48 @@
 
     targetWC.filePath = path;
     targetWC.encoding = detectedEncoding;
-    [targetWC.editor np_setText:content];
 
-    // Detect and preserve Line Endings
-    if ([content containsString:@"\r\n"]) {
-        [targetWC.editor message:SCI_SETEOLMODE wParam:SC_EOL_CRLF lParam:0];
-    } else if ([content containsString:@"\n"]) {
-        [targetWC.editor message:SCI_SETEOLMODE wParam:SC_EOL_LF lParam:0];
-    } else if ([content containsString:@"\r"]) {
-        [targetWC.editor message:SCI_SETEOLMODE wParam:SC_EOL_CR lParam:0];
+    // Fast Line Ending Detection: sample first 64 KB instead of whole document
+    long detectedEOL = SC_EOL_LF;
+    size_t sampleLen = MIN((size_t)length, (size_t)65536);
+    for (size_t i = contentOffset; i < sampleLen; i++) {
+        if (bytes[i] == '\r') {
+            if (i + 1 < sampleLen && bytes[i + 1] == '\n') {
+                detectedEOL = SC_EOL_CRLF;
+            } else {
+                detectedEOL = SC_EOL_CR;
+            }
+            break;
+        } else if (bytes[i] == '\n') {
+            detectedEOL = SC_EOL_LF;
+            break;
+        }
     }
 
-    [targetWC.editor message:SCI_SETSAVEPOINT];
+    // High performance direct buffer load into Scintilla
+    ScintillaView *editor = targetWC.editor;
+    [editor suspendDrawing:YES];
+    [editor message:SCI_SETUNDOCOLLECTION wParam:0 lParam:0];
+    [editor message:SCI_CLEARALL];
+
+    if (isDirectUTF8) {
+        size_t textLen = length - contentOffset;
+        const char *textPtr = (const char *)(bytes + contentOffset);
+        [editor message:SCI_ALLOCATE wParam:textLen lParam:0];
+        [editor message:SCI_APPENDTEXT wParam:textLen lParam:(sptr_t)textPtr];
+    } else if (convertedUTF8Data) {
+        [editor message:SCI_ALLOCATE wParam:convertedUTF8Data.length lParam:0];
+        [editor message:SCI_APPENDTEXT wParam:convertedUTF8Data.length lParam:(sptr_t)convertedUTF8Data.bytes];
+    }
+
+    [editor message:SCI_SETEOLMODE wParam:detectedEOL lParam:0];
+    [editor message:SCI_SETUNDOCOLLECTION wParam:1 lParam:0];
+    [editor message:SCI_EMPTYUNDOBUFFER];
+    [editor message:SCI_SETSAVEPOINT];
+    [editor suspendDrawing:NO];
+
     targetWC.isDirty = NO;
+    [editor np_updateLineNumberMarginWidth];
     [targetWC updateWindowTitle];
     [targetWC updateStatusBar];
     [targetWC updateEmptyStateVisibility];
@@ -163,60 +206,98 @@
         return [self saveAsController:controller];
     }
 
-    NSString *content = [controller.editor np_text];
-    NSError *error = nil;
-
-    // Convert EOL mode to disk representation if needed
-    long eolMode = [controller.editor getGeneralProperty:SCI_GETEOLMODE];
-    NSString *eolString = @"\n";
-    if (eolMode == SC_EOL_CRLF) {
-        eolString = @"\r\n";
-    } else if (eolMode == SC_EOL_CR) {
-        eolString = @"\r";
-    }
-
-    // Normalize line endings to chosen EOL mode
-    NSString *normalizedContent = content;
-    if (eolMode == SC_EOL_CRLF) {
-        normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
-        normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\r" withString:@"\n"];
-        normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\n" withString:@"\r\n"];
-    } else if (eolMode == SC_EOL_CR) {
-        normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
-        normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\n" withString:@"\r"];
-    } else {  // SC_EOL_LF
-        normalizedContent = [content stringByReplacingOccurrencesOfString:@"\r\n" withString:@"\n"];
-        normalizedContent = [normalizedContent stringByReplacingOccurrencesOfString:@"\r" withString:@"\n"];
-    }
+    NSString *path = controller.filePath;
+    ScintillaView *editor = controller.editor;
+    long totalLen = [editor message:SCI_GETLENGTH];
 
     // Backup on save if enabled in preferences
     PreferencesManager *prefs = [PreferencesManager sharedManager];
-    if (prefs.backupOnSave && [[NSFileManager defaultManager] fileExistsAtPath:controller.filePath]) {
-        NSString *bakPath = [controller.filePath stringByAppendingPathExtension:@"bak"];
+    if (prefs.backupOnSave && [[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        NSString *bakPath = [path stringByAppendingPathExtension:@"bak"];
         [[NSFileManager defaultManager] removeItemAtPath:bakPath error:nil];
-        [[NSFileManager defaultManager] copyItemAtPath:controller.filePath toPath:bakPath error:nil];
+        [[NSFileManager defaultManager] copyItemAtPath:path toPath:bakPath error:nil];
     }
 
-    BOOL success = [normalizedContent writeToFile:controller.filePath
-                                       atomically:YES
-                                         encoding:controller.encoding
-                                            error:&error];
-
-    if (success) {
-        [controller.editor message:SCI_SETSAVEPOINT];
-        controller.isDirty = NO;
-        [controller updateWindowTitle];
-        [controller updateStatusBar];
-        [[NSDocumentController sharedDocumentController]
-            noteNewRecentDocumentURL:[NSURL fileURLWithPath:controller.filePath]];
-        return YES;
-    } else {
+    // High performance streaming write directly from Scintilla buffer in 1 MB chunks
+    NSString *tempPath = [path stringByAppendingFormat:@".%@.tmp", [[NSUUID UUID] UUIDString]];
+    int fd = open([tempPath UTF8String], O_WRONLY | O_CREAT | O_TRUNC, 0666);
+    if (fd < 0) {
         NSAlert *alert = [[NSAlert alloc] init];
         alert.messageText = @"Save Failed";
-        alert.informativeText = error.localizedDescription ?: @"Could not save document.";
+        alert.informativeText = [NSString stringWithFormat:@"Could not create temporary file: %s", strerror(errno)];
         [alert beginSheetModalForWindow:controller.window completionHandler:nil];
         return NO;
     }
+
+    const size_t chunkSize = 1024 * 1024;  // 1 MB buffer
+    char *buffer = (char *)malloc(chunkSize + 1);
+    if (!buffer) {
+        close(fd);
+        unlink([tempPath UTF8String]);
+        return NO;
+    }
+
+    long written = 0;
+    BOOL writeFailed = NO;
+    Sci_TextRange tr;
+
+    while (written < totalLen) {
+        long take = MIN((long)chunkSize, totalLen - written);
+        tr.chrg.cpMin = written;
+        tr.chrg.cpMax = written + take;
+        tr.lpstrText = buffer;
+        [editor message:SCI_GETTEXTRANGE wParam:0 lParam:(sptr_t)&tr];
+
+        ssize_t res = write(fd, buffer, take);
+        if (res < 0) {
+            writeFailed = YES;
+            break;
+        }
+        written += take;
+    }
+
+    free(buffer);
+    close(fd);
+
+    if (writeFailed) {
+        unlink([tempPath UTF8String]);
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = @"Save Failed";
+        alert.informativeText = [NSString stringWithFormat:@"Write error: %s", strerror(errno)];
+        [alert beginSheetModalForWindow:controller.window completionHandler:nil];
+        return NO;
+    }
+
+    // Atomically replace original file
+    NSError *replaceError = nil;
+    NSURL *tempURL = [NSURL fileURLWithPath:tempPath];
+    NSURL *destURL = [NSURL fileURLWithPath:path];
+    BOOL success = [[NSFileManager defaultManager] replaceItemAtURL:destURL
+                                                      withItemAtURL:tempURL
+                                                     backupItemName:nil
+                                                            options:0
+                                                   resultingItemURL:nil
+                                                              error:&replaceError];
+    if (!success) {
+        if (rename([tempPath UTF8String], [path UTF8String]) == 0) {
+            success = YES;
+        } else {
+            unlink([tempPath UTF8String]);
+            NSAlert *alert = [[NSAlert alloc] init];
+            alert.messageText = @"Save Failed";
+            alert.informativeText = replaceError.localizedDescription ?: @"Could not save document.";
+            [alert beginSheetModalForWindow:controller.window completionHandler:nil];
+            return NO;
+        }
+    }
+
+    [editor message:SCI_SETSAVEPOINT];
+    controller.isDirty = NO;
+    [controller updateWindowTitle];
+    [controller updateStatusBar];
+    [[NSDocumentController sharedDocumentController]
+        noteNewRecentDocumentURL:[NSURL fileURLWithPath:controller.filePath]];
+    return YES;
 }
 
 - (BOOL)saveAsController:(NotepadWindowController *)controller {
