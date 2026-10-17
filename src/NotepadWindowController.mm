@@ -86,6 +86,12 @@
     _tabBarView.autoresizingMask = NSViewWidthSizable | NSViewMinYMargin;
     _tabBarView.delegate = self;
     [contentView addSubview:_tabBarView];
+
+    contentView.postsFrameChangedNotifications = YES;
+    [[NSNotificationCenter defaultCenter] addObserver:self
+                                             selector:@selector(contentViewFrameDidChange:)
+                                                 name:NSViewFrameDidChangeNotification
+                                               object:contentView];
 }
 
 - (void)layoutSubviews {
@@ -107,6 +113,18 @@
         tab.editor.frame = editorFrame;
         tab.emptyOverlayView.frame = editorFrame;
     }
+
+    // Ensure status bar and tab bar stay strictly above all editor views in the z-order
+    if (self.statusBar && self.statusBar.superview == contentView) {
+        [contentView addSubview:self.statusBar positioned:NSWindowAbove relativeTo:nil];
+    }
+    if (self.tabBarView && self.tabBarView.superview == contentView) {
+        [contentView addSubview:self.tabBarView positioned:NSWindowAbove relativeTo:nil];
+    }
+}
+
+- (void)contentViewFrameDidChange:(NSNotification *)notification {
+    [self layoutSubviews];
 }
 
 - (void)windowDidResize:(NSNotification *)notification {
@@ -192,7 +210,7 @@
 
     item.editor.frame = editorFrame;
     item.editor.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
-    [contentView addSubview:item.editor positioned:NSWindowBelow relativeTo:self.tabBarView];
+    [contentView addSubview:item.editor positioned:NSWindowBelow relativeTo:self.statusBar];
 
     item.emptyOverlayView.frame = editorFrame;
     item.emptyOverlayView.autoresizingMask = NSViewWidthSizable | NSViewHeightSizable;
@@ -240,6 +258,7 @@
     if (activeTab) {
         NSView *targetFocus = activeTab.editor.content ?: activeTab.editor;
         [self.window makeFirstResponder:targetFocus];
+        [activeTab.editor np_updateLineNumberMarginWidth];
     }
 
     [self applyThemeAndAppearance];
@@ -501,6 +520,7 @@
 
 - (void)loadFile:(NSString *)path {
     [[NotepadFileManager sharedManager] openFileAtPath:path inController:self];
+    [self.editor np_updateLineNumberMarginWidth];
     [self updateEmptyStateVisibility];
 }
 
@@ -548,6 +568,9 @@
         if ((notification->modificationType & (SC_MOD_INSERTTEXT | SC_MOD_DELETETEXT)) != 0) {
             [[FindReplaceController sharedController] editorContentDidChange:self.editor];
             [self updateEmptyStateVisibility];
+            if (notification->linesAdded != 0) {
+                [self.editor np_updateLineNumberMarginWidth];
+            }
         }
         break;
     case SCN_CHARADDED:

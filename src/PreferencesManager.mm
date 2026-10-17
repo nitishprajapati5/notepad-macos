@@ -126,7 +126,7 @@ static NSString *const kNPUseRandomTabColorsKey = @"NP.useRandomTabColors";
         kNPTabWidthKey: @(4),
         kNPUseSpacesKey: @(NO),
         kNPWordWrapKey: @(NO),
-        kNPShowLineNumbersKey: @(NO),
+        kNPShowLineNumbersKey: @(YES),
         kNPShowStatusBarKey: @(YES),
         kNPThemeModeKey: @(NPThemeModeSystem),
         kNPDefaultEncodingKey: @(NSUTF8StringEncoding),

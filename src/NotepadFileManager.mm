@@ -64,20 +64,20 @@
         content = [[NSString alloc] initWithData:data encoding:detectedEncoding];
     }
 
-    // 2. Try default encoding first if specified and not UTF-8
-    NSStringEncoding preferredEncoding = [PreferencesManager sharedManager].defaultEncoding;
-    if (preferredEncoding != NSUTF8StringEncoding) {
-        content = [[NSString alloc] initWithData:data encoding:preferredEncoding];
-        if (content) {
-            detectedEncoding = preferredEncoding;
-        }
-    }
-
-    // 3. Try UTF-8 without BOM
+    // 2. Try UTF-8 without BOM first (standard modern text format)
     if (!content) {
         content = [[NSString alloc] initWithData:data encoding:NSUTF8StringEncoding];
         if (content) {
             detectedEncoding = NSUTF8StringEncoding;
+        }
+    }
+
+    // 3. Try preferred default encoding if UTF-8 was not valid
+    NSStringEncoding preferredEncoding = [PreferencesManager sharedManager].defaultEncoding;
+    if (!content && preferredEncoding != NSUTF8StringEncoding) {
+        content = [[NSString alloc] initWithData:data encoding:preferredEncoding];
+        if (content) {
+            detectedEncoding = preferredEncoding;
         }
     }
 

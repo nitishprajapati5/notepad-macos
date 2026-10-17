@@ -12,6 +12,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)np_wordWrap;
 - (void)np_setLineNumbersVisible:(BOOL)visible;
 - (BOOL)np_lineNumbersVisible;
+- (void)np_updateLineNumberMarginWidth;
 - (void)np_setFontName:(NSString *)fontName size:(NSInteger)pointSize;
 - (NSString *)np_fontName;
 - (NSInteger)np_fontSize;

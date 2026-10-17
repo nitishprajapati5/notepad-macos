@@ -61,6 +61,8 @@
     }
 
     // Line number margin styling (when enabled)
+    [self setStringProperty:SCI_STYLESETFONT parameter:STYLE_LINENUMBER value:fontName];
+    [self setGeneralProperty:SCI_STYLESETSIZE parameter:STYLE_LINENUMBER value:fontSize];
     [self message:SCI_STYLESETFORE wParam:STYLE_LINENUMBER lParam:lineNumFore];
     [self message:SCI_STYLESETBACK wParam:STYLE_LINENUMBER lParam:lineNumBack];
 
@@ -98,14 +100,44 @@
 - (void)np_setLineNumbersVisible:(BOOL)visible {
     if (visible) {
         [self setGeneralProperty:SCI_SETMARGINTYPEN parameter:0 value:SC_MARGIN_NUMBER];
-        [self setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:42];
+        [self np_updateLineNumberMarginWidthForced:YES];
     } else {
         [self setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:0];
     }
 }
 
 - (BOOL)np_lineNumbersVisible {
-    return [self getGeneralProperty:SCI_GETMARGINWIDTHN parameter:0] > 0;
+    return [self getGeneralProperty:SCI_GETMARGINTYPEN parameter:0] == SC_MARGIN_NUMBER &&
+           [self getGeneralProperty:SCI_GETMARGINWIDTHN parameter:0] > 0;
+}
+
+- (void)np_updateLineNumberMarginWidth {
+    [self np_updateLineNumberMarginWidthForced:NO];
+}
+
+- (void)np_updateLineNumberMarginWidthForced:(BOOL)forced {
+    if (!forced) {
+        if (![self np_lineNumbersVisible]) {
+            return;
+        }
+    }
+    [self setGeneralProperty:SCI_SETMARGINTYPEN parameter:0 value:SC_MARGIN_NUMBER];
+    int lineCount = (int)[self message:SCI_GETLINECOUNT];
+    int digits = 1;
+    int temp = lineCount;
+    while (temp >= 10) {
+        temp /= 10;
+        digits++;
+    }
+    digits = MAX(3, digits);
+    long charWidth = [self message:SCI_TEXTWIDTH wParam:STYLE_LINENUMBER lParam:(sptr_t) "9"];
+    if (charWidth <= 0) {
+        charWidth = 8;
+    }
+    int marginWidth = (int)(charWidth * digits + 14);
+    if (forced || [self getGeneralProperty:SCI_GETMARGINWIDTHN parameter:0] != marginWidth) {
+        [self setGeneralProperty:SCI_SETMARGINWIDTHN parameter:0 value:marginWidth];
+    }
 }
 
 - (void)np_setFontName:(NSString *)fontName size:(NSInteger)pointSize {

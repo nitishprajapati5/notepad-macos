@@ -1,4 +1,5 @@
 #import "StatusBarView.h"
+#import "PreferencesManager.h"
 
 @interface StatusBarSegmentButton : NSButton
 @property (nonatomic, assign) BOOL isHovered;
@@ -201,20 +202,24 @@
     return box;
 }
 
+- (BOOL)isOpaque {
+    return YES;
+}
+
 - (void)drawRect:(NSRect)dirtyRect {
     [super drawRect:dirtyRect];
 
-    [[NSColor windowBackgroundColor] setFill];
-    NSRectFill(dirtyRect);
+    BOOL isDark = [[PreferencesManager sharedManager] isDarkModeActive];
+    NSColor *bgColor = isDark ? [NSColor colorWithCalibratedRed:0.12 green:0.12 blue:0.13 alpha:1.0]
+                              : [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
+    [bgColor setFill];
+    NSRectFill(self.bounds);
 
     // Subtle 1px top border line
-    [[NSColor separatorColor] setStroke];
-    NSBezierPath *topBorder = [NSBezierPath bezierPath];
-    CGFloat y = NSMaxY(self.bounds) - 0.5;
-    [topBorder moveToPoint:NSMakePoint(dirtyRect.origin.x, y)];
-    [topBorder lineToPoint:NSMakePoint(NSMaxX(dirtyRect), y)];
-    [topBorder setLineWidth:1.0];
-    [topBorder stroke];
+    NSColor *topBorderColor =
+        isDark ? [NSColor colorWithCalibratedWhite:1.0 alpha:0.12] : [NSColor colorWithCalibratedWhite:0.0 alpha:0.12];
+    [topBorderColor setFill];
+    NSRectFill(NSMakeRect(0, self.bounds.size.height - 1.0, self.bounds.size.width, 1.0));
 }
 
 #pragma mark - Segment Click Handlers
