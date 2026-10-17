@@ -117,6 +117,22 @@ format:
 	@$(CLANG_FORMAT) -i -style=file src/*.h src/*.mm
 	@echo "✅ Formatted successfully"
 
+check-format:
+	@echo "Checking formatting of sources in src/..."
+	@$(CLANG_FORMAT) --dry-run --Werror -style=file src/*.h src/*.mm
+	@echo "✅ Code formatting check passed"
+
+package: all
+	@echo "📦 Packaging Notepad for macOS..."
+	@rm -rf build/dist build/Notepad-macOS.dmg build/Notepad-macOS-Universal.zip build/checksums.txt
+	@mkdir -p build/dist/Notepad
+	@cp -R $(BUNDLE_DIR) build/dist/Notepad/
+	@ln -s /Applications build/dist/Notepad/Applications
+	@hdiutil create -volname "Notepad" -srcfolder build/dist/Notepad -ov -format UDZO build/Notepad-macOS.dmg
+	@cd build && zip -q -r -y Notepad-macOS-Universal.zip $(APP_NAME).app
+	@shasum -a 256 build/Notepad-macOS.dmg build/Notepad-macOS-Universal.zip > build/checksums.txt
+	@echo "✅ Packaged: build/Notepad-macOS.dmg and build/Notepad-macOS-Universal.zip"
+
 clean:
-	rm -rf build/
+	rm -rf build/ build-cmake/
 

@@ -1,0 +1,82 @@
+name: CI
+
+on:
+  push:
+    branches: [ main, ci-cd-branch ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  format-check:
+    name: Code Style & Format Check
+    runs-on: macos-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify code formatting
+        run: make check-format
+
+  build-universal:
+    name: Universal Build (arm64 + x86_64)
+    runs-on: macos-14
+    needs: format-check
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Build Universal App Bundle
+        run: make all -j4
+
+      - name: Verify Universal 2 Binary Architectures
+        run: |
+          echo "Checking binary architectures with lipo..."
+          lipo -info build/Notepad.app/Contents/MacOS/Notepad
+          lipo -info build/Notepad.app/Contents/MacOS/Notepad | grep -q "arm64"
+          lipo -info build/Notepad.app/Contents/MacOS/Notepad | grep -q "x86_64"
+          echo "✅ Verified Universal 2 (arm64 + x86_64) binary"
+
+      - name: Verify App Bundle Structure
+        run: |
+          test -f build/Notepad.app/Contents/MacOS/Notepad
+          test -f build/Notepad.app/Contents/Info.plist
+          test -f build/Notepad.app/Contents/Resources/AppIcon.icns
+          echo "✅ Verified App Bundle structure and resources"
+
+      - name: Package DMG and ZIP
+        run: make package
+
+      - name: Upload Build Artifacts (DMG & ZIP)
+        uses: actions/upload-artifact@v4
+        with:
+          name: Notepad-macOS-Universal
+          path: |
+            build/Notepad-macOS.dmg
+            build/Notepad-macOS-Universal.zip
+            build/checksums.txt
+          retention-days: 14
+
+  cmake-build:
+    name: CMake Build Verification
+    runs-on: macos-latest
+    needs: format-check
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure CMake
+        run: cmake -B build-cmake -DCMAKE_BUILD_TYPE=Release
+
+      - name: Build with CMake
+        run: cmake --build build-cmake -j4
+
+      - name: Verify CMake Output
+        run: |
+          test -f build-cmake/Notepad.app/Contents/MacOS/Notepad
+          lipo -info build-cmake/Notepad.app/Contents/MacOS/Notepad
+          echo "✅ CMake build successful"

@@ -1,5 +1,8 @@
 # Notepad for macOS
 
+[![CI](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/ci.yml/badge.svg)](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/ci.yml)
+[![Release](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/release.yml/badge.svg)](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/release.yml)
+
 A fast, lightweight, native macOS text editor designed to bring the classic simplicity, speed, and familiarity of **Windows Notepad** to the Mac. Powered by the battle-tested **Scintilla 5** editing engine and built with **Objective-C++** directly on Cocoa.
 
 ---
@@ -97,6 +100,21 @@ The resulting application bundle will be located at:
 ```
 build-cmake/Notepad.app
 ```
+
+---
+
+## Packaging for Distribution (DMG & ZIP)
+
+Create a signed/notarized-ready installer disk image (`.dmg`) and compressed archive (`.zip`) with SHA-256 checksums:
+
+```bash
+make package
+```
+
+Outputs:
+* `build/Notepad-macOS.dmg` — Drag-and-drop macOS installer disk image.
+* `build/Notepad-macOS-Universal.zip` — Portable universal bundle archive.
+* `build/checksums.txt` — SHA-256 integrity hashes.
 
 ---
 
