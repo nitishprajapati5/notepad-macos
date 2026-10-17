@@ -2,6 +2,9 @@
 
 [![CI](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/ci.yml/badge.svg)](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/ci.yml)
 [![Release](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/release.yml/badge.svg)](https://github.com/nitishprajapati5/notepad-macos/actions/workflows/release.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Contributor Covenant](https://img.shields.io/badge/Contributor%20Covenant-2.1-4baaaa.svg)](CODE_OF_CONDUCT.md)
 
 A fast, lightweight, native macOS text editor designed to bring the classic simplicity, speed, and familiarity of **Windows Notepad** to the Mac. Powered by the battle-tested **Scintilla 5** editing engine and built with **Objective-C++** directly on Cocoa.
 
@@ -171,7 +174,18 @@ open -a build/Notepad.app document.txt
 
 ---
 
+## Contributing & Community
+
+Contributions are warmly welcome! Whether you are reporting a bug, proposing a new feature, improving documentation, or submitting a pull request, we'd love your help:
+
+* **[Contributing Guidelines](CONTRIBUTING.md)** — Step-by-step development setup, build instructions, coding standards, and Conventional Commits workflow.
+* **[Code of Conduct](CODE_OF_CONDUCT.md)** — Contributor Covenant v2.1 community standards and pledge.
+* **[Security Policy](SECURITY.md)** — Vulnerability disclosure procedure and supported versions.
+* **[Issue Tracker](https://github.com/nitishprajapati5/notepad-macos/issues)** — Bug reports, feature suggestions, and discussions.
+
+---
+
 ## License & Credits
 
-* **Scintilla**: Copyright © 1998-2023 by Neil Hodgson. Used under the Scintilla License.
-* **Notepad for macOS**: Open-source, licensed under the MIT License.
+* **Scintilla**: Copyright © 1998-2023 by Neil Hodgson. Used under the [Scintilla License](scintilla/License.txt).
+* **Notepad for macOS**: Open-source, licensed under the [MIT License](LICENSE).

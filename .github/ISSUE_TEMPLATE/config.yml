@@ -1,0 +1,11 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 🔒 Security Vulnerability
+    url: https://github.com/nitishprajapati5/notepad-macos/security/advisories/new
+    about: Please report security vulnerabilities privately using GitHub Security Advisories.
+  - name: 📖 Project Documentation & Architecture
+    url: https://github.com/nitishprajapati5/notepad-macos#architecture--project-structure
+    about: Read about project structure, build targets, and keyboard shortcuts.
+  - name: 🤝 Contribution Guide
+    url: https://github.com/nitishprajapati5/notepad-macos/blob/main/CONTRIBUTING.md
+    about: Learn how to set up your local development environment and submit pull requests.
