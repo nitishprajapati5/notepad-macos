@@ -45,10 +45,15 @@ file(GLOB APP_HEADERS "src/*.h")
 
 add_executable(Notepad MACOSX_BUNDLE ${APP_SRCS} ${APP_HEADERS})
 
+set(NOTEPAD_VERSION "1.0.0" CACHE STRING "Notepad Semantic Version")
+set(NOTEPAD_BUILD_NUMBER "1" CACHE STRING "Notepad Build Number")
+
 set_target_properties(Notepad PROPERTIES
     MACOSX_BUNDLE_INFO_PLIST "${CMAKE_SOURCE_DIR}/resources/Info.plist"
     MACOSX_BUNDLE_BUNDLE_NAME "Notepad"
     MACOSX_BUNDLE_GUI_IDENTIFIER "com.notepad.mac"
+    MACOSX_BUNDLE_SHORT_VERSION_STRING "${NOTEPAD_VERSION}"
+    MACOSX_BUNDLE_BUNDLE_VERSION "${NOTEPAD_BUILD_NUMBER}"
 )
 
 target_include_directories(Notepad PRIVATE

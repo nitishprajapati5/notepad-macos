@@ -3,6 +3,9 @@
 # ==============================================================================
 
 APP_NAME      = Notepad
+VERSION       ?= 1.0.0
+BUILD_NUMBER  ?= 1
+
 BUNDLE_DIR    = build/$(APP_NAME).app
 CONTENTS_DIR  = $(BUNDLE_DIR)/Contents
 MACOS_DIR     = $(CONTENTS_DIR)/MacOS
@@ -74,7 +77,9 @@ $(MACOS_DIR)/$(APP_NAME): $(ALL_OBJS) | $(MACOS_DIR)
 
 # Bundle Info.plist and resources
 $(CONTENTS_DIR)/Info.plist: resources/Info.plist | $(CONTENTS_DIR) $(RESOURCES_DIR)
-	cp $< $@
+	@cp $< $@
+	@plutil -replace CFBundleShortVersionString -string "$(VERSION)" $@
+	@plutil -replace CFBundleVersion -string "$(BUILD_NUMBER)" $@
 	@cp -f scintilla/cocoa/res/*.png $(RESOURCES_DIR)/ 2>/dev/null || true
 	@cp -f resources/*.icns $(RESOURCES_DIR)/ 2>/dev/null || true
 
@@ -123,15 +128,17 @@ check-format:
 	@echo "✅ Code formatting check passed"
 
 package: all
-	@echo "📦 Packaging Notepad for macOS..."
-	@rm -rf build/dist build/Notepad-macOS.dmg build/Notepad-macOS-Universal.zip build/checksums.txt
+	@echo "📦 Packaging $(APP_NAME) v$(VERSION) (Build $(BUILD_NUMBER)) for macOS..."
+	@rm -rf build/dist build/Notepad-macOS* build/checksums.txt
 	@mkdir -p build/dist/Notepad
 	@cp -R $(BUNDLE_DIR) build/dist/Notepad/
 	@ln -s /Applications build/dist/Notepad/Applications
-	@hdiutil create -volname "Notepad" -srcfolder build/dist/Notepad -ov -format UDZO build/Notepad-macOS.dmg
-	@cd build && zip -q -r -y Notepad-macOS-Universal.zip $(APP_NAME).app
-	@shasum -a 256 build/Notepad-macOS.dmg build/Notepad-macOS-Universal.zip > build/checksums.txt
-	@echo "✅ Packaged: build/Notepad-macOS.dmg and build/Notepad-macOS-Universal.zip"
+	@hdiutil create -volname "Notepad $(VERSION)" -srcfolder build/dist/Notepad -ov -format UDZO build/Notepad-macOS-v$(VERSION).dmg
+	@cd build && zip -q -r -y Notepad-macOS-v$(VERSION)-Universal.zip $(APP_NAME).app
+	@cp -f build/Notepad-macOS-v$(VERSION).dmg build/Notepad-macOS.dmg
+	@cp -f build/Notepad-macOS-v$(VERSION)-Universal.zip build/Notepad-macOS-Universal.zip
+	@shasum -a 256 build/Notepad-macOS-v$(VERSION).dmg build/Notepad-macOS-v$(VERSION)-Universal.zip build/Notepad-macOS.dmg build/Notepad-macOS-Universal.zip > build/checksums.txt
+	@echo "✅ Packaged: build/Notepad-macOS-v$(VERSION).dmg and build/Notepad-macOS-v$(VERSION)-Universal.zip"
 
 clean:
 	rm -rf build/ build-cmake/

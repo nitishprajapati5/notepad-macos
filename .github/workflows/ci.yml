@@ -49,7 +49,7 @@ jobs:
           echo "✅ Verified App Bundle structure and resources"
 
       - name: Package DMG and ZIP
-        run: make package
+        run: make package BUILD_NUMBER=${{ github.run_number }}
 
       - name: Upload Build Artifacts (DMG & ZIP)
         uses: actions/upload-artifact@v4

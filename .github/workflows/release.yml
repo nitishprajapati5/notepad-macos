@@ -2,49 +2,44 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
   workflow_dispatch:
-    inputs:
-      draft:
-        description: 'Create draft release'
-        required: false
-        type: boolean
-        default: false
-      prerelease:
-        description: 'Mark as pre-release'
-        required: false
-        type: boolean
-        default: false
 
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
-  publish-release:
-    name: Build & Publish Release
+  release:
+    name: Semantic Release & Packaging
     runs-on: macos-14
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-
-      - name: Build & Package Universal App Bundle
-        run: make package
-
-      - name: Verify Release Assets
-        run: |
-          test -f build/Notepad-macOS.dmg
-          test -f build/Notepad-macOS-Universal.zip
-          test -f build/checksums.txt
-          cat build/checksums.txt
-
-      - name: Create GitHub Release & Upload Assets
-        uses: softprops/action-gh-release@v2
         with:
-          files: |
-            build/Notepad-macOS.dmg
-            build/Notepad-macOS-Universal.zip
-            build/checksums.txt
-          draft: ${{ github.event.inputs.draft || false }}
-          prerelease: ${{ github.event.inputs.prerelease || false }}
-          generate_release_notes: true
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install Semantic Release & Plugins
+        run: |
+          npm install --no-save \
+            semantic-release@^24 \
+            @semantic-release/commit-analyzer@^13 \
+            @semantic-release/release-notes-generator@^14 \
+            @semantic-release/changelog@^6 \
+            @semantic-release/exec@^6 \
+            @semantic-release/git@^10 \
+            @semantic-release/github@^11
+
+      - name: Run Semantic Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: npx semantic-release
