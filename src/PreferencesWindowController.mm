@@ -529,6 +529,9 @@ static void NPDrawPreviewPlus(NSRect rect, NSColor *color) {
 // Backup & Advanced Controls
 @property (nonatomic, strong) NSButton *backupOnSaveCheckbox;
 @property (nonatomic, strong) NSButton *autoIndentCheckbox;
+@property (nonatomic, strong) NSButton *restoreSessionCheckbox;
+@property (nonatomic, strong) NSButton *continuousAutoSaveCheckbox;
+@property (nonatomic, strong) NSButton *versionHistoryCheckbox;
 
 // Tracked labels & boxes for dynamic Light / Dark mode updates
 @property (nonatomic, strong) NSMutableArray<NSBox *> *cardBoxes;
@@ -1176,35 +1179,80 @@ static void NPDrawPreviewPlus(NSRect rect, NSColor *color) {
     [self.themeView addSubview:themeCard];
 }
 
-// 5. Backup & Advanced View
+// 4. Backup & Advanced View
 - (void)buildBackupView:(NSRect)bounds {
     self.backupView = [[NSView alloc] initWithFrame:bounds];
 
     CGFloat cardWidth = bounds.size.width - 48;
 
-    // Card 1: Backup on Save (Height 140)
-    CGFloat backupCardHeight = 142;
-    CGFloat backupCardY = bounds.size.height - backupCardHeight - 24;
-    NSBox *backupCard = [self createCardWithTitle:@"Backup on Save"
+    // Card 1: Session Preservation & Auto-Save (Height 150)
+    CGFloat sessionCardHeight = 150;
+    CGFloat sessionCardY = bounds.size.height - sessionCardHeight - 20;
+    NSBox *sessionCard = [self createCardWithTitle:@"Session Preservation & Auto-Save"
+                                             frame:NSMakeRect(24, sessionCardY, cardWidth, sessionCardHeight)];
+
+    self.restoreSessionCheckbox = [NSButton checkboxWithTitle:@"Restore open tabs and scratchpads on launch"
+                                                       target:self
+                                                       action:@selector(restoreSessionToggled:)];
+    self.restoreSessionCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.restoreSessionCheckbox.frame = NSMakeRect(24, 88, cardWidth - 48, 22);
+    [sessionCard addSubview:self.restoreSessionCheckbox];
+
+    NSTextField *restoreDesc =
+        [self makeDescriptionLabel:@"Reopens all open documents and unsaved drafts when launching Notepad."
+                             frame:NSMakeRect(48, 68, cardWidth - 72, 18)];
+    [sessionCard addSubview:restoreDesc];
+
+    self.continuousAutoSaveCheckbox = [NSButton checkboxWithTitle:@"Continuous auto-save in background"
+                                                           target:self
+                                                           action:@selector(continuousAutoSaveToggled:)];
+    self.continuousAutoSaveCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.continuousAutoSaveCheckbox.frame = NSMakeRect(24, 38, cardWidth - 48, 22);
+    [sessionCard addSubview:self.continuousAutoSaveCheckbox];
+
+    NSTextField *autoSaveDesc =
+        [self makeDescriptionLabel:@"Automatically saves modified files periodically without prompting."
+                             frame:NSMakeRect(48, 18, cardWidth - 72, 18)];
+    [sessionCard addSubview:autoSaveDesc];
+
+    [self.backupView addSubview:sessionCard];
+
+    // Card 2: Document Version History & Backups (Height 150)
+    CGFloat backupCardHeight = 150;
+    CGFloat backupCardY = sessionCardY - backupCardHeight - 12;
+    NSBox *backupCard = [self createCardWithTitle:@"Document Version History & Backups"
                                             frame:NSMakeRect(24, backupCardY, cardWidth, backupCardHeight)];
 
-    self.backupOnSaveCheckbox = [NSButton checkboxWithTitle:@"Enable backup on save (.bak)"
+    self.versionHistoryCheckbox =
+        [NSButton checkboxWithTitle:@"Maintain version snapshots (Time Machine / NSFileVersion)"
+                             target:self
+                             action:@selector(versionHistoryToggled:)];
+    self.versionHistoryCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
+    self.versionHistoryCheckbox.frame = NSMakeRect(24, 88, cardWidth - 48, 22);
+    [backupCard addSubview:self.versionHistoryCheckbox];
+
+    NSTextField *verDesc =
+        [self makeDescriptionLabel:@"Enables File → Browse Version History to preview and restore previous versions."
+                             frame:NSMakeRect(48, 68, cardWidth - 72, 18)];
+    [backupCard addSubview:verDesc];
+
+    self.backupOnSaveCheckbox = [NSButton checkboxWithTitle:@"Create duplicate backup on save (.bak)"
                                                      target:self
                                                      action:@selector(backupOnSaveToggled:)];
     self.backupOnSaveCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
-    self.backupOnSaveCheckbox.frame = NSMakeRect(24, 68, cardWidth - 48, 24);
+    self.backupOnSaveCheckbox.frame = NSMakeRect(24, 38, cardWidth - 48, 22);
     [backupCard addSubview:self.backupOnSaveCheckbox];
 
-    NSString *backupText = @"Creates a duplicate copy of the existing file with a .bak extension "
-                           @"prior to writing new changes, protecting against accidental data loss.";
-    NSTextField *backupDesc = [self makeDescriptionLabel:backupText frame:NSMakeRect(48, 20, cardWidth - 72, 40)];
+    NSTextField *backupDesc =
+        [self makeDescriptionLabel:@"Creates a .bak copy alongside the file prior to writing new changes."
+                             frame:NSMakeRect(48, 18, cardWidth - 72, 18)];
     [backupCard addSubview:backupDesc];
 
     [self.backupView addSubview:backupCard];
 
-    // Card 2: Auto-Indentation (Height 136)
-    CGFloat indentCardHeight = 138;
-    CGFloat indentCardY = backupCardY - indentCardHeight - 16;
+    // Card 3: Auto-Indentation (Height 96)
+    CGFloat indentCardHeight = 96;
+    CGFloat indentCardY = backupCardY - indentCardHeight - 12;
     NSBox *indentCard = [self createCardWithTitle:@"Auto-Indentation"
                                             frame:NSMakeRect(24, indentCardY, cardWidth, indentCardHeight)];
 
@@ -1212,12 +1260,12 @@ static void NPDrawPreviewPlus(NSRect rect, NSColor *color) {
                                                    target:self
                                                    action:@selector(autoIndentToggled:)];
     self.autoIndentCheckbox.font = [NSFont systemFontOfSize:13.0 weight:NSFontWeightRegular];
-    self.autoIndentCheckbox.frame = NSMakeRect(24, 66, cardWidth - 48, 24);
+    self.autoIndentCheckbox.frame = NSMakeRect(24, 46, cardWidth - 48, 22);
     [indentCard addSubview:self.autoIndentCheckbox];
 
-    NSString *indentText = @"When pressing Return/Enter, the new line will automatically match the "
-                           @"leading indentation depth of the preceding line.";
-    NSTextField *indentDesc = [self makeDescriptionLabel:indentText frame:NSMakeRect(48, 20, cardWidth - 72, 38)];
+    NSString *indentText =
+        @"When pressing Return, the new line will automatically match the leading indentation depth.";
+    NSTextField *indentDesc = [self makeDescriptionLabel:indentText frame:NSMakeRect(48, 20, cardWidth - 72, 20)];
     [indentCard addSubview:indentDesc];
 
     [self.backupView addSubview:indentCard];
@@ -1372,6 +1420,9 @@ static void NPDrawPreviewPlus(NSRect rect, NSColor *color) {
     // Backup & Advanced
     self.backupOnSaveCheckbox.state = prefs.backupOnSave ? NSControlStateValueOn : NSControlStateValueOff;
     self.autoIndentCheckbox.state = prefs.autoIndent ? NSControlStateValueOn : NSControlStateValueOff;
+    self.restoreSessionCheckbox.state = prefs.restoreSessionOnLaunch ? NSControlStateValueOn : NSControlStateValueOff;
+    self.continuousAutoSaveCheckbox.state = prefs.continuousAutoSave ? NSControlStateValueOn : NSControlStateValueOff;
+    self.versionHistoryCheckbox.state = prefs.versionHistoryEnabled ? NSControlStateValueOn : NSControlStateValueOff;
 
     [self updateTabColorControls];
     [self updateFontPreview];
@@ -1518,6 +1569,24 @@ static void NPDrawPreviewPlus(NSRect rect, NSColor *color) {
 - (void)autoIndentToggled:(id)sender {
     PreferencesManager *prefs = [PreferencesManager sharedManager];
     prefs.autoIndent = (self.autoIndentCheckbox.state == NSControlStateValueOn);
+    [prefs savePreferences];
+}
+
+- (void)restoreSessionToggled:(id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.restoreSessionOnLaunch = (self.restoreSessionCheckbox.state == NSControlStateValueOn);
+    [prefs savePreferences];
+}
+
+- (void)continuousAutoSaveToggled:(id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.continuousAutoSave = (self.continuousAutoSaveCheckbox.state == NSControlStateValueOn);
+    [prefs savePreferences];
+}
+
+- (void)versionHistoryToggled:(id)sender {
+    PreferencesManager *prefs = [PreferencesManager sharedManager];
+    prefs.versionHistoryEnabled = (self.versionHistoryCheckbox.state == NSControlStateValueOn);
     [prefs savePreferences];
 }
 

@@ -14,6 +14,12 @@ NS_ASSUME_NONNULL_BEGIN
 - (BOOL)saveAsController:(NotepadWindowController *)controller;
 - (void)revertController:(NotepadWindowController *)controller;
 
+// macOS Document Versioning & Time Machine snapshots
+- (void)recordVersionSnapshotForPath:(NSString *)path;
+- (NSArray<NSDictionary<NSString *, id> *> *)savedVersionsForPath:(NSString *)path;
+- (BOOL)restoreVersionAtPath:(NSString *)versionPath toOriginalPath:(NSString *)originalPath;
+- (void)deleteVersionAtPath:(NSString *)versionPath;
+
 @end
 
 NS_ASSUME_NONNULL_END

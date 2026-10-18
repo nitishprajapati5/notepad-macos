@@ -8,6 +8,7 @@ NS_ASSUME_NONNULL_BEGIN
 
 @class FindReplaceController;
 @class EmptyDocumentOverlayView;
+@class VersionHistoryWindowController;
 
 @interface NotepadWindowController
     : NSWindowController <NSWindowDelegate, ScintillaNotificationProtocol, NSMenuItemValidation, StatusBarViewDelegate,
@@ -21,6 +22,7 @@ NS_ASSUME_NONNULL_BEGIN
 @property (nonatomic, strong) NSView *editorContainerView;
 @property (nonatomic, strong) StatusBarView *statusBar;
 @property (nonatomic, strong, nullable) FindReplaceController *findReplaceController;
+@property (nonatomic, strong, nullable) VersionHistoryWindowController *versionHistoryController;
 
 // Convenience dynamic accessors mapping to the active tab
 @property (nonatomic, readonly, nullable) ScintillaView *editor;
@@ -55,6 +57,7 @@ NS_ASSUME_NONNULL_BEGIN
 - (IBAction)saveDocument:(nullable id)sender;
 - (IBAction)saveDocumentAs:(nullable id)sender;
 - (IBAction)revertDocument:(nullable id)sender;
+- (IBAction)browseVersionHistory:(nullable id)sender;
 - (IBAction)runPageSpec:(nullable id)sender;
 - (IBAction)runPageLayout:(nullable id)sender;
 - (IBAction)printDocument:(nullable id)sender;
