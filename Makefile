@@ -147,6 +147,13 @@ sign: package
 	@echo "✍️ Signing Notepad.app and DMG with Hardened Runtime..."
 	@./scripts/notarize.sh --sign-only $(if $(SIGN_IDENTITY),--identity "$(SIGN_IDENTITY)",)
 
+sign-adhoc: package
+	@echo "✍️ Signing Notepad.app and DMG with Ad-Hoc signature (Free / No Apple ID)..."
+	@./scripts/notarize.sh --adhoc --skip-build
+
+update-cask: package
+	@./scripts/update-cask.sh
+
 verify-signature:
 	@echo "🛡️ Verifying code signatures..."
 	@codesign --verify --deep --strict --verbose=2 $(BUNDLE_DIR)

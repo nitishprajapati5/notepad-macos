@@ -52,6 +52,7 @@ API_KEY_ID="${API_KEY_ID:-}"
 API_ISSUER="${API_ISSUER:-}"
 SIGN_ONLY=false
 SKIP_BUILD=false
+ADHOC=false
 
 while [[ "$#" -gt 0 ]]; do
     case $1 in
@@ -63,12 +64,14 @@ while [[ "$#" -gt 0 ]]; do
         --api-key-path) API_KEY_PATH="$2"; shift ;;
         --api-key-id) API_KEY_ID="$2"; shift ;;
         --api-issuer) API_ISSUER="$2"; shift ;;
+        --adhoc) ADHOC=true; SIGN_ONLY=true ;;
         --sign-only) SIGN_ONLY=true ;;
         --skip-build) SKIP_BUILD=true ;;
         -h|--help)
             echo "Usage: $0 [options]"
             echo "Options:"
-            echo "  --identity <name>            Code signing identity name or hash"
+            echo "  --adhoc                      Sign with ad-hoc signature (no Apple ID required)"
+            echo "  --identity <name>            Code signing identity name or hash (use '-' for ad-hoc)"
             echo "  --keychain-profile <name>    notarytool keychain profile name"
             echo "  --apple-id <email>           Apple ID email for notarization"
             echo "  --password <pwd>             App-specific password"
@@ -90,7 +93,9 @@ echo -e "${BLUE}  Notepad for macOS — Signing & Notarization Pipeline ${NC}"
 echo -e "${BLUE}======================================================${NC}"
 
 # 1. Detect Code Signing Identity
-if [ -z "$SIGN_IDENTITY" ]; then
+if [ "$ADHOC" = true ] || [ "$SIGN_IDENTITY" = "-" ]; then
+    SIGN_IDENTITY="-"
+elif [ -z "$SIGN_IDENTITY" ]; then
     echo -e "🔍 Auto-detecting Developer ID Application certificate..."
     SIGN_IDENTITY=$(security find-identity -v -p codesigning | grep "Developer ID Application" | head -n 1 | awk -F'"' '{print $2}' || true)
     
@@ -105,12 +110,22 @@ if [ -z "$SIGN_IDENTITY" ]; then
 fi
 
 if [ -z "$SIGN_IDENTITY" ]; then
-    echo -e "${RED}❌ Error: No valid code signing identity found in macOS Keychain.${NC}"
-    echo "Run 'security find-identity -v -p codesigning' to check available identities."
-    exit 1
+    if [ "$SIGN_ONLY" = true ]; then
+        echo -e "${YELLOW}ℹ️ No certificate found in Keychain. Defaulting to Ad-Hoc signature (-s -).${NC}"
+        SIGN_IDENTITY="-"
+    else
+        echo -e "${RED}❌ Error: No valid code signing identity found in macOS Keychain.${NC}"
+        echo "Run 'security find-identity -v -p codesigning' to check available identities."
+        echo "Or run with '--adhoc' / '--sign-only' to sign locally without an Apple ID."
+        exit 1
+    fi
 fi
 
-echo -e "🔑 Using Signing Identity: ${GREEN}$SIGN_IDENTITY${NC}"
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    echo -e "🔑 Using Signing Identity: ${GREEN}Ad-Hoc (Free / No Apple ID)${NC}"
+else
+    echo -e "🔑 Using Signing Identity: ${GREEN}$SIGN_IDENTITY${NC}"
+fi
 
 # 2. Build binaries if needed
 if [ "$SKIP_BUILD" = false ]; then
@@ -124,12 +139,17 @@ if [ ! -d "$APP_PATH" ]; then
     exit 1
 fi
 
-# 3. Code-sign Application Bundle with Hardened Runtime
-echo -e "\n✍️  Code-signing Notepad.app with Hardened Runtime..."
-codesign --deep --force --options runtime --timestamp \
-    --entitlements "$ENTITLEMENTS_PATH" \
-    --sign "$SIGN_IDENTITY" \
-    "$APP_PATH"
+# 3. Code-sign Application Bundle
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    echo -e "\n✍️  Code-signing Notepad.app with Ad-Hoc signature..."
+    codesign --deep --force --sign - "$APP_PATH"
+else
+    echo -e "\n✍️  Code-signing Notepad.app with Hardened Runtime..."
+    codesign --deep --force --options runtime --timestamp \
+        --entitlements "$ENTITLEMENTS_PATH" \
+        --sign "$SIGN_IDENTITY" \
+        "$APP_PATH"
+fi
 
 echo -e "🔎 Verifying bundle signature..."
 codesign --verify --deep --strict --verbose=2 "$APP_PATH"
@@ -146,22 +166,32 @@ fi
 
 # 5. Code-sign DMG
 echo -e "✍️  Code-signing DMG: $DMG_PATH..."
-codesign --force --timestamp \
-    --sign "$SIGN_IDENTITY" \
-    "$DMG_PATH"
-
-# Also sign default link if present
-if [ -f "build/Notepad-macOS.dmg" ] && [ "build/Notepad-macOS.dmg" != "$DMG_PATH" ]; then
-    codesign --force --timestamp --sign "$SIGN_IDENTITY" "build/Notepad-macOS.dmg" || true
+if [ "$SIGN_IDENTITY" = "-" ]; then
+    codesign --force --sign - "$DMG_PATH"
+    if [ -f "build/Notepad-macOS.dmg" ] && [ "build/Notepad-macOS.dmg" != "$DMG_PATH" ]; then
+        codesign --force --sign - "build/Notepad-macOS.dmg" || true
+    fi
+else
+    codesign --force --timestamp \
+        --sign "$SIGN_IDENTITY" \
+        "$DMG_PATH"
+    if [ -f "build/Notepad-macOS.dmg" ] && [ "build/Notepad-macOS.dmg" != "$DMG_PATH" ]; then
+        codesign --force --timestamp --sign "$SIGN_IDENTITY" "build/Notepad-macOS.dmg" || true
+    fi
 fi
 
 codesign --verify --strict --verbose=2 "$DMG_PATH"
 echo -e "${GREEN}✅ DMG signed and verified!${NC}"
 
 if [ "$SIGN_ONLY" = true ]; then
-    echo -e "\n${GREEN}🎉 Finished --sign-only!${NC}"
+    echo -e "\n${GREEN}🎉 Finished Signing (Sign-Only)!${NC}"
     echo "  App: $APP_PATH"
     echo "  DMG: $DMG_PATH"
+    if [ "$SIGN_IDENTITY" = "-" ]; then
+        echo -e "\n${YELLOW}💡 Note for users downloading un-notarized app:${NC}"
+        echo "  • Open via Right-Click → Open → Open"
+        echo "  • Or run: xattr -cr /Applications/Notepad.app"
+    fi
     exit 0
 fi
 

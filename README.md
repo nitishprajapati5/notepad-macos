@@ -30,6 +30,38 @@ A fast, lightweight, native macOS text editor designed to bring the classic simp
 
 ---
 
+## Installation
+
+### Option A: Install via Homebrew Cask (Recommended)
+
+Install directly with a single command without worrying about macOS Gatekeeper warnings:
+
+```bash
+brew install --cask https://raw.githubusercontent.com/nitishprajapati5/notepad-macos/main/Casks/notepad.rb
+```
+
+Or via the custom tap:
+
+```bash
+brew tap nitishprajapati5/notepad
+brew install --cask notepad
+```
+
+---
+
+### Option B: Download Installer DMG (GitHub Releases)
+
+1. Download the latest **`Notepad-macOS-vX.X.X.dmg`** from [GitHub Releases](https://github.com/nitishprajapati5/notepad-macos/releases).
+2. Open the DMG and drag **Notepad.app** into your **/Applications** folder.
+3. **First-Launch on macOS (Unnotarized / Open-Source):**
+   - **Method 1 (GUI):** In Finder, go to `/Applications`, **Right-click (Control-click)** on `Notepad.app`, and select **Open**. Click **Open** on the confirmation prompt.
+   - **Method 2 (Terminal):** Run the following command once:
+     ```bash
+     xattr -cr /Applications/Notepad.app
+     ```
+
+---
+
 ## Architecture & Project Structure
 
 The project follows a clean, modular structure modeled after modern Mac Scintilla applications:
