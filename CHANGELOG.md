@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/nitishprajapati5/notepad-macos/compare/v1.0.0...v1.1.0) (2026-10-18)
+
+
+### Features
+
+* implement automatic session preservation, continuous auto-save, and macOS version history ([e99448d](https://github.com/nitishprajapati5/notepad-macos/commit/e99448dd3801ef7c15974690d7426bebddbc6bf3))
+
 # 1.0.0 (2026-10-17)
 
 
