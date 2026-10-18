@@ -21,6 +21,9 @@ typedef NS_ENUM(NSInteger, NPThemeMode) { NPThemeModeLight = 0, NPThemeModeDark 
 @property (nonatomic, assign) BOOL autoIndent;
 @property (nonatomic, copy) NSString *activeTabColorHex;
 @property (nonatomic, assign) BOOL useRandomTabColors;
+@property (nonatomic, assign) BOOL restoreSessionOnLaunch;
+@property (nonatomic, assign) BOOL continuousAutoSave;
+@property (nonatomic, assign) BOOL versionHistoryEnabled;
 
 + (instancetype)sharedManager;
 + (NSArray<NSDictionary<NSString *, id> *> *)supportedEncodings;

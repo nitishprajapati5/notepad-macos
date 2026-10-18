@@ -3,6 +3,7 @@
 #import "AppDelegate.h"
 #import "ScintillaView+Notepad.h"
 #import "PreferencesManager.h"
+#import "SessionManager.h"
 #import "Scintilla.h"
 
 @implementation NotepadFileManager
@@ -297,6 +298,12 @@
     [controller updateStatusBar];
     [[NSDocumentController sharedDocumentController]
         noteNewRecentDocumentURL:[NSURL fileURLWithPath:controller.filePath]];
+
+    // Record macOS Document Version snapshot
+    if ([PreferencesManager sharedManager].versionHistoryEnabled) {
+        [self recordVersionSnapshotForPath:controller.filePath];
+    }
+
     return YES;
 }
 
@@ -338,6 +345,125 @@
                           [self openFileAtPath:controller.filePath inController:controller];
                       }
                   }];
+}
+
+#pragma mark - macOS Versioning & Local History
+
+- (NSString *)hashForPath:(NSString *)path {
+    NSData *data = [path dataUsingEncoding:NSUTF8StringEncoding];
+    return [data base64EncodedStringWithOptions:0];
+}
+
+- (void)recordVersionSnapshotForPath:(NSString *)path {
+    if (!path || ![[NSFileManager defaultManager] fileExistsAtPath:path]) {
+        return;
+    }
+
+    // 1. Native macOS NSFileVersion
+    NSURL *fileURL = [NSURL fileURLWithPath:path];
+    NSError *verError = nil;
+    [NSFileVersion addVersionOfItemAtURL:fileURL withContentsOfURL:fileURL options:0 error:&verError];
+
+    // 2. High-reliability localized snapshot storage
+    NSString *baseDir = [[SessionManager sharedManager] versionHistoryDirectoryPath];
+    NSString *hashDir = [baseDir stringByAppendingPathComponent:[self hashForPath:path]];
+    [[NSFileManager defaultManager] createDirectoryAtPath:hashDir
+                              withIntermediateDirectories:YES
+                                               attributes:nil
+                                                    error:nil];
+
+    NSDateFormatter *df = [[NSDateFormatter alloc] init];
+    [df setDateFormat:@"yyyy-MM-dd_HH-mm-ss"];
+    NSString *timestamp = [df stringFromDate:[NSDate date]];
+    NSString *snapshotPath = [hashDir
+        stringByAppendingPathComponent:[NSString stringWithFormat:@"%@_%@", timestamp, [path lastPathComponent]]];
+
+    [[NSFileManager defaultManager] copyItemAtPath:path toPath:snapshotPath error:nil];
+
+    // Prune versions if more than 50
+    NSArray *files = [[NSFileManager defaultManager] contentsOfDirectoryAtPath:hashDir error:nil];
+    if (files.count > 50) {
+        NSArray *sorted = [files sortedArrayUsingSelector:@selector(compare:)];
+        for (NSUInteger i = 0; i < files.count - 50; i++) {
+            NSString *oldFile = [hashDir stringByAppendingPathComponent:sorted[i]];
+            [[NSFileManager defaultManager] removeItemAtPath:oldFile error:nil];
+        }
+    }
+}
+
+- (NSArray<NSDictionary<NSString *, id> *> *)savedVersionsForPath:(NSString *)path {
+    if (!path) {
+        return @[];
+    }
+
+    NSMutableArray<NSDictionary<NSString *, id> *> *result = [NSMutableArray array];
+    NSFileManager *fm = [NSFileManager defaultManager];
+
+    // Read localized history snapshots
+    NSString *baseDir = [[SessionManager sharedManager] versionHistoryDirectoryPath];
+    NSString *hashDir = [baseDir stringByAppendingPathComponent:[self hashForPath:path]];
+    NSArray *files = [fm contentsOfDirectoryAtPath:hashDir error:nil];
+    if (files) {
+        NSArray *sorted = [files sortedArrayUsingComparator:^NSComparisonResult(NSString *a, NSString *b) {
+            return [b compare:a];  // newest first
+        }];
+
+        for (NSString *filename in sorted) {
+            NSString *fullPath = [hashDir stringByAppendingPathComponent:filename];
+            NSDictionary *attrs = [fm attributesOfItemAtPath:fullPath error:nil];
+            NSDate *modDate = attrs[NSFileModificationDate] ?: [NSDate date];
+            unsigned long long fileSize = [attrs[NSFileSize] unsignedLongLongValue];
+
+            [result addObject:@{@"path": fullPath, @"date": modDate, @"size": @(fileSize), @"name": filename}];
+        }
+    }
+
+    // Also include other versions from NSFileVersion if available
+    NSURL *fileURL = [NSURL fileURLWithPath:path];
+    NSArray<NSFileVersion *> *otherVersions = [NSFileVersion otherVersionsOfItemAtURL:fileURL];
+    for (NSFileVersion *ver in otherVersions) {
+        if (ver.URL) {
+            NSDictionary *attrs = [fm attributesOfItemAtPath:ver.URL.path error:nil];
+            NSDate *verDate = ver.modificationDate ?: (attrs[NSFileModificationDate] ?: [NSDate date]);
+            unsigned long long size = [attrs[NSFileSize] unsignedLongLongValue];
+
+            BOOL exists = NO;
+            for (NSDictionary *existing in result) {
+                if (fabs([existing[@"date"] timeIntervalSinceDate:verDate]) < 2.0) {
+                    exists = YES;
+                    break;
+                }
+            }
+            if (!exists) {
+                [result addObject:@{
+                    @"path": ver.URL.path,
+                    @"date": verDate,
+                    @"size": @(size),
+                    @"name": ver.localizedName ?: [path lastPathComponent]
+                }];
+            }
+        }
+    }
+
+    [result sortUsingComparator:^NSComparisonResult(NSDictionary *a, NSDictionary *b) {
+        return [b[@"date"] compare:a[@"date"]];
+    }];
+
+    return result;
+}
+
+- (BOOL)restoreVersionAtPath:(NSString *)versionPath toOriginalPath:(NSString *)originalPath {
+    if (!versionPath || !originalPath)
+        return NO;
+    NSError *err = nil;
+    [[NSFileManager defaultManager] removeItemAtPath:originalPath error:nil];
+    return [[NSFileManager defaultManager] copyItemAtPath:versionPath toPath:originalPath error:&err];
+}
+
+- (void)deleteVersionAtPath:(NSString *)versionPath {
+    if (versionPath) {
+        [[NSFileManager defaultManager] removeItemAtPath:versionPath error:nil];
+    }
 }
 
 @end

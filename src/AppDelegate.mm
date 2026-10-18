@@ -5,6 +5,7 @@
 #import "ScintillaView+Notepad.h"
 #import "PreferencesManager.h"
 #import "PreferencesWindowController.h"
+#import "SessionManager.h"
 
 @implementation AppDelegate
 
@@ -25,9 +26,27 @@
         [NSApp setApplicationIconImage:appIcon];
     }
 
-    if (self.windowControllers.count == 0) {
+    BOOL restored = NO;
+    if ([PreferencesManager sharedManager].restoreSessionOnLaunch) {
+        restored = [[SessionManager sharedManager] restoreSession];
+    }
+
+    if (!restored && self.windowControllers.count == 0) {
         [self newDocument:nil];
     }
+}
+
+- (NSApplicationTerminateReply)applicationShouldTerminate:(NSApplication *)sender {
+    if ([PreferencesManager sharedManager].restoreSessionOnLaunch) {
+        [SessionManager sharedManager].isAppTerminating = YES;
+        [[SessionManager sharedManager] saveCurrentSession];
+        return NSTerminateNow;
+    }
+    return NSTerminateNow;
+}
+
+- (void)applicationWillResignActive:(NSNotification *)notification {
+    [[SessionManager sharedManager] flushPendingAutoSaves];
 }
 
 - (BOOL)application:(NSApplication *)sender openFile:(NSString *)filename {
@@ -158,6 +177,10 @@
     NSMenuItem *saveAs = [fileMenu addItemWithTitle:@"Save As…" action:@selector(saveDocumentAs:) keyEquivalent:@"S"];
     [saveAs setKeyEquivalentModifierMask:(NSEventModifierFlagShift | NSEventModifierFlagCommand)];
     [fileMenu addItemWithTitle:@"Revert to Saved" action:@selector(revertDocument:) keyEquivalent:@""];
+    NSMenuItem *verHist = [fileMenu addItemWithTitle:@"Browse Version History…"
+                                              action:@selector(browseVersionHistory:)
+                                       keyEquivalent:@"R"];
+    [verHist setKeyEquivalentModifierMask:(NSEventModifierFlagShift | NSEventModifierFlagCommand)];
     [fileMenu addItem:[NSMenuItem separatorItem]];
     NSMenuItem *pageSetup = [fileMenu addItemWithTitle:@"Page Setup…"
                                                 action:@selector(runPageSpec:)

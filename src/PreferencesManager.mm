@@ -15,6 +15,9 @@ static NSString *const kNPBackupOnSaveKey = @"NP.backupOnSave";
 static NSString *const kNPAutoIndentKey = @"NP.autoIndent";
 static NSString *const kNPActiveTabColorKey = @"NP.activeTabColor";
 static NSString *const kNPUseRandomTabColorsKey = @"NP.useRandomTabColors";
+static NSString *const kNPRestoreSessionKey = @"NP.restoreSessionOnLaunch";
+static NSString *const kNPContinuousAutoSaveKey = @"NP.continuousAutoSave";
+static NSString *const kNPVersionHistoryKey = @"NP.versionHistoryEnabled";
 
 @implementation PreferencesManager
 
@@ -133,7 +136,10 @@ static NSString *const kNPUseRandomTabColorsKey = @"NP.useRandomTabColors";
         kNPBackupOnSaveKey: @(NO),
         kNPAutoIndentKey: @(YES),
         kNPActiveTabColorKey: @"#D98226",
-        kNPUseRandomTabColorsKey: @(NO)
+        kNPUseRandomTabColorsKey: @(NO),
+        kNPRestoreSessionKey: @(YES),
+        kNPContinuousAutoSaveKey: @(YES),
+        kNPVersionHistoryKey: @(YES)
     };
     [defs registerDefaults:defaults];
 
@@ -154,6 +160,9 @@ static NSString *const kNPUseRandomTabColorsKey = @"NP.useRandomTabColors";
     _autoIndent = [defs boolForKey:kNPAutoIndentKey];
     _activeTabColorHex = [defs stringForKey:kNPActiveTabColorKey] ?: @"#D98226";
     _useRandomTabColors = [defs boolForKey:kNPUseRandomTabColorsKey];
+    _restoreSessionOnLaunch = [defs boolForKey:kNPRestoreSessionKey];
+    _continuousAutoSave = [defs boolForKey:kNPContinuousAutoSaveKey];
+    _versionHistoryEnabled = [defs boolForKey:kNPVersionHistoryKey];
 }
 
 - (void)savePreferences {
@@ -171,6 +180,9 @@ static NSString *const kNPUseRandomTabColorsKey = @"NP.useRandomTabColors";
     [defs setBool:_autoIndent forKey:kNPAutoIndentKey];
     [defs setObject:_activeTabColorHex forKey:kNPActiveTabColorKey];
     [defs setBool:_useRandomTabColors forKey:kNPUseRandomTabColorsKey];
+    [defs setBool:_restoreSessionOnLaunch forKey:kNPRestoreSessionKey];
+    [defs setBool:_continuousAutoSave forKey:kNPContinuousAutoSaveKey];
+    [defs setBool:_versionHistoryEnabled forKey:kNPVersionHistoryKey];
     [defs synchronize];
 
     [[NSNotificationCenter defaultCenter] postNotificationName:NPPreferencesDidChangeNotification object:self];

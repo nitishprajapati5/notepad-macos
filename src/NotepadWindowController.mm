@@ -8,6 +8,8 @@
 #import "PreferencesManager.h"
 #import "Scintilla.h"
 #import "ScintillaPrintView.h"
+#import "SessionManager.h"
+#import "VersionHistoryWindowController.h"
 
 @interface NotepadWindowController ()
 @end
@@ -231,6 +233,8 @@
     if (index < 0 || index >= (NSInteger)self.tabs.count)
         return;
 
+    [[SessionManager sharedManager] flushPendingAutoSaves];
+
     _currentTabIndex = index;
     self.tabBarView.selectedIndex = index;
 
@@ -292,10 +296,14 @@
         }
     }
 
+    [[SessionManager sharedManager] discardScratchpadForTabId:tab.tabId];
+
     [tab.editor removeFromSuperview];
     [tab.emptyOverlayView removeFromSuperview];
     [self.tabs removeObjectAtIndex:index];
     self.tabBarView.tabs = self.tabs;
+
+    [[SessionManager sharedManager] saveCurrentSession];
 
     if (self.tabs.count == 0) {
         // If last tab is closed, create a fresh untitled tab (Notepad++ behavior)
@@ -571,6 +579,9 @@
             if (notification->linesAdded != 0) {
                 [self.editor np_updateLineNumberMarginWidth];
             }
+            if (self.currentTab) {
+                [[SessionManager sharedManager] notifyTabContentChanged:self.currentTab inController:self];
+            }
         }
         break;
     case SCN_CHARADDED:
@@ -597,6 +608,15 @@
 #pragma mark - Window Delegate
 
 - (BOOL)windowShouldClose:(NSWindow *)sender {
+    if ([SessionManager sharedManager].isAppTerminating) {
+        return YES;
+    }
+
+    if ([PreferencesManager sharedManager].restoreSessionOnLaunch) {
+        [[SessionManager sharedManager] saveCurrentSession];
+        return YES;
+    }
+
     for (NSInteger i = 0; i < (NSInteger)self.tabs.count; i++) {
         NotepadTabItem *tab = self.tabs[i];
         if (tab.isDirty) {
@@ -654,6 +674,21 @@
 
 - (IBAction)revertDocument:(nullable id)sender {
     [[NotepadFileManager sharedManager] revertController:self];
+}
+
+- (IBAction)browseVersionHistory:(nullable id)sender {
+    if (!self.filePath) {
+        NSAlert *alert = [[NSAlert alloc] init];
+        alert.messageText = @"Document Not Saved";
+        alert.informativeText =
+            @"Please save this document first to start tracking and browsing its version history snapshots.";
+        [alert beginSheetModalForWindow:self.window completionHandler:nil];
+        return;
+    }
+
+    self.versionHistoryController = [[VersionHistoryWindowController alloc] initWithFilePath:self.filePath
+                                                                            sourceController:self];
+    [self.versionHistoryController showVersionHistoryWindow];
 }
 
 - (IBAction)runPageSpec:(nullable id)sender {
@@ -915,6 +950,9 @@
     }
     if (action == @selector(revertDocument:)) {
         return (self.filePath != nil && self.isDirty);
+    }
+    if (action == @selector(browseVersionHistory:)) {
+        return (self.filePath != nil);
     }
 
     return YES;
