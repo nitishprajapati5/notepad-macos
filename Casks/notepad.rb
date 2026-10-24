@@ -14,7 +14,7 @@ cask "notepad" do
 
   app "Notepad.app"
 
-  postflight do
+  postflight_steps do
     # Remove macOS quarantine flag so users can open the app without Gatekeeper blocking
     system_command "/usr/bin/xattr",
                    args: ["-cr", "#{appdir}/Notepad.app"],
