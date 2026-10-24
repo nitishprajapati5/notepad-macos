@@ -1,6 +1,6 @@
 cask "notepad" do
   version "1.0.0"
-  sha256 "5287607cbddf927937c9ef9db0a5fded46755b0b408f98ba1719b1e825bf5c04"
+  sha256 "45509453a21f7b5775e92064c02e0fb774c4975a0340c668d588616ebfa306ac"
 
   url "https://github.com/nitishprajapati5/notepad-macos/releases/download/v#{version}/Notepad-macOS-v#{version}.dmg"
   name "Notepad"
