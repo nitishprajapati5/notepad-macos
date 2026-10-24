@@ -1,3 +1,10 @@
+## [1.2.1](https://github.com/nitishprajapati5/notepad-macos/compare/v1.2.0...v1.2.1) (2026-10-24)
+
+
+### Bug Fixes
+
+* replace deprecated postflight with postflight_steps ([fa26664](https://github.com/nitishprajapati5/notepad-macos/commit/fa266648cb1a96bddeefb7606f341a8febfdaf20))
+
 # [1.2.0](https://github.com/nitishprajapati5/notepad-macos/compare/v1.1.0...v1.2.0) (2026-10-24)
 
 
