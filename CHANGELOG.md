@@ -1,3 +1,11 @@
+## [1.2.2](https://github.com/nitishprajapati5/notepad-macos/compare/v1.2.1...v1.2.2) (2026-10-24)
+
+
+### Bug Fixes
+
+* remove postflight_steps block (appdir not available in modern Homebrew DSL) ([eb6d255](https://github.com/nitishprajapati5/notepad-macos/commit/eb6d2551879204cf040cd657800fef3eed6c7240))
+* update sha256 checksum to match current DMG release ([02d41b4](https://github.com/nitishprajapati5/notepad-macos/commit/02d41b4f2439c771307276b2224184b1d24abfef))
+
 ## [1.2.1](https://github.com/nitishprajapati5/notepad-macos/compare/v1.2.0...v1.2.1) (2026-10-24)
 
 
