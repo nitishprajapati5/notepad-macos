@@ -1,3 +1,11 @@
+# [1.2.0](https://github.com/nitishprajapati5/notepad-macos/compare/v1.1.0...v1.2.0) (2026-10-24)
+
+
+### Features
+
+* add ad-hoc signing workflow and homebrew cask distribution ([e0f9bbb](https://github.com/nitishprajapati5/notepad-macos/commit/e0f9bbba322cb3cc0e88c907709db70d146353ff))
+* add hardened runtime entitlements, signing, and notarization pipeline ([cf65e5e](https://github.com/nitishprajapati5/notepad-macos/commit/cf65e5ee1ee13aaeaed0411f707354bd1f933158))
+
 # [1.1.0](https://github.com/nitishprajapati5/notepad-macos/compare/v1.0.0...v1.1.0) (2026-10-18)
 
 
